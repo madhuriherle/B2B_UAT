@@ -1,0 +1,19 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+psycopg[binary]==3.2.3
+python-dotenv==1.0.1
+pydantic==2.10.4
+email-validator==2.2.0
+reportlab==4.5.1
+bcrypt==4.0.1
+PyJWT==2.9.0
+python-multipart==0.0.28
+razorpay==2.0.1
+requests==2.34.0
+openpyxl==3.1.5
+
+# Admin Portal (app/b2c_admin) — SQLAlchemy ORM, separate from the psycopg
+# driver above but pointed at the same DATABASE_URL.
+SQLAlchemy==2.0.48
+psycopg2-binary==2.9.11
+Jinja2==3.1.6

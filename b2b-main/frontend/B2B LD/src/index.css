@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, select, textarea, button {
+  font-family: inherit;
+}
+
+.price-number-input {
+  -moz-appearance: textfield;
+}
+
+.price-number-input::-webkit-outer-spin-button,
+.price-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Every horizontally-scrollable table/card container in the app uses the
+   Tailwind `overflow-x-auto` class for this exact purpose (confirmed: every
+   <table> in the codebase has one immediately above it). Styling it once
+   here — instead of the OS's own thin/overlay scrollbar, easy to miss when
+   it sits at the bottom of a rounded card — makes "there's more to scroll to
+   see the rest of this table" visually obvious and consistent everywhere,
+   without touching any of those individual files. Firefox uses the
+   standard scrollbar-width/-color properties; Chromium/Edge/Safari use the
+   ::-webkit-scrollbar pseudo-elements below for the same effect. */
+.overflow-x-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #9CC3DE #EAF2F8;
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 8px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: #EAF2F8;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #9CC3DE;
+  border-radius: 999px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #1E6091;
+}

@@ -1,8 +1,9 @@
+import os
 import paramiko
 cmd = "journalctl -u legaldeskb2b.service -n 50"
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect(hostname="187.127.173.22", username="root", password="Legal@Desk1234567")
+client.connect(hostname=os.environ["VPS_HOST"], username=os.environ.get("VPS_USER", "root"), password=os.environ["VPS_PASSWORD"])
 stdin, stdout, stderr = client.exec_command(cmd)
 print("STDOUT:", stdout.read().decode())
 print("STDERR:", stderr.read().decode())

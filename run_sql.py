@@ -1,3 +1,4 @@
+import os
 import paramiko
 import sys
 
@@ -7,8 +8,8 @@ INSERT INTO public.users VALUES ('6cf904bc-410f-4706-be56-6a318dd7ad50', 'admin@
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect(hostname="187.127.173.22", username="root", password="Legal@Desk1234567")
-stdin, stdout, stderr = client.exec_command('PGPASSWORD=password psql -h localhost -U postgres -d legaldesk_db')
+client.connect(hostname=os.environ["VPS_HOST"], username=os.environ.get("VPS_USER", "root"), password=os.environ["VPS_PASSWORD"])
+stdin, stdout, stderr = client.exec_command(f'PGPASSWORD={os.environ["PG_PASSWORD"]} psql -h localhost -U postgres -d legaldesk_db')
 stdin.write(sql)
 stdin.channel.shutdown_write()
 

@@ -128,6 +128,10 @@ app.include_router(reports.router, prefix="/api/reports", tags=["reports"], depe
 app.include_router(estamp_bulk.router, prefix="/api/estamp-bulk", tags=["estamp-bulk"], dependencies=admin_only)
 app.include_router(manual_estamp.router, prefix="/api/manual-estamp", tags=["manual-estamp"], dependencies=admin_only)
 app.include_router(esign_admin.router, prefix="/api/esign-admin", tags=["esign-admin"], dependencies=admin_only)
+
+from app.routes import loan_documents
+app.include_router(loan_documents.router, prefix="/api/admin/loan-config", tags=["loan-config"], dependencies=admin_only)
+
 # partner.py declares Depends(get_current_partner) on each endpoint individually (it also
 # needs the resolved organization_id, not just a boolean gate), so no router-level dependency here.
 app.include_router(partner.router, prefix="/api/partner", tags=["partner"])

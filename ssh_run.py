@@ -1,3 +1,4 @@
+import os
 import paramiko
 import sys
 
@@ -21,4 +22,4 @@ def run_ssh(host, username, password, command):
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
-        run_ssh("187.127.173.22", "root", "Legal@Desk1234567", cmd)
+        run_ssh(os.environ["VPS_HOST"], os.environ.get("VPS_USER", "root"), os.environ["VPS_PASSWORD"], cmd)

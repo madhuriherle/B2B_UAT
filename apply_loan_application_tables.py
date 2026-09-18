@@ -36,7 +36,7 @@ try:
 
     print("Applying LOAN APPLICATIONS tables (CREATE TABLE IF NOT EXISTS — additive only, no drops)...")
     stdin, stdout, stderr = client.exec_command(
-        f'PGPASSWORD={os.environ["PG_PASSWORD"]} PGCLIENTENCODING=UTF8 psql -h localhost -U postgres -d legaldesk_db '
+        f'PGPASSWORD={os.environ["PG_PASSWORD"]} PGCLIENTENCODING=UTF8 psql -h localhost -U postgres -d legaldesk_db_uat '
         f'-f /tmp/create_loan_application_tables.sql'
     )
     print("STDOUT:", stdout.read().decode("utf-8"))

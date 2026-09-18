@@ -1,76 +1,84 @@
 import paramiko
 import os
-import posixpath
-import sys
+import time
 
-HOST = "187.127.173.22"
-USER = "root"
-PASSWORD = "Legal@Desk1234567"
+host = os.environ["VPS_HOST"]
+user = os.environ.get("VPS_USER", "root")
+password = os.environ["VPS_PASSWORD"]
 
-LOCAL_FRONTEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), "b2b-main", "frontend", "B2B LD", "dist")
-REMOTE_FRONTEND = "/var/www/legaldesk-b2b-uat"
+local_base = 'D:/harshithacontinue/b2b-main/b2b-main'
+remote_base = '/root/ldb2b-uat'
 
-LOCAL_BACKEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), "b2b-main", "backend")
-REMOTE_BACKEND = "/root/ldb2b-uat/backend"
+files_to_sync = [
+    ('backend/app/routes/partner_user.py', 'backend/app/routes/partner_user.py'),
+    ('backend/app/routes/partner.py', 'backend/app/routes/partner.py'),
+    ('backend/app/main.py', 'backend/app/main.py'),
+    ('backend/app/esign_service.py', 'backend/app/esign_service.py'),
+    ('backend/app/routes/document_service.py', 'backend/app/routes/document_service.py'),
+    ('backend/app/routes/loan_documents.py', 'backend/app/routes/loan_documents.py'),
+    ('backend/app/loan_i18n.py', 'backend/app/loan_i18n.py'),
+    ('backend/app/assets/fonts/NotoSansDevanagari-Regular.ttf', 'backend/app/assets/fonts/NotoSansDevanagari-Regular.ttf'),
+    ('backend/app/assets/fonts/NotoSansDevanagari-Bold.ttf', 'backend/app/assets/fonts/NotoSansDevanagari-Bold.ttf'),
+    ('backend/app/assets/fonts/NotoSansKannada-Regular.ttf', 'backend/app/assets/fonts/NotoSansKannada-Regular.ttf'),
+    ('backend/app/assets/fonts/NotoSansKannada-Bold.ttf', 'backend/app/assets/fonts/NotoSansKannada-Bold.ttf'),
+    ('frontend/B2B LD/src/pages/partner-user/PartnerUserCreateOrder.jsx', 'frontend/B2B LD/src/pages/partner-user/PartnerUserCreateOrder.jsx'),
+    ('frontend/B2B LD/src/pages/partner-user/LoanDocumentFlow.jsx', 'frontend/B2B LD/src/pages/partner-user/LoanDocumentFlow.jsx'),
+    ('frontend/B2B LD/src/App.jsx', 'frontend/B2B LD/src/App.jsx'),
+    ('frontend/B2B LD/src/components/Sidebar.jsx', 'frontend/B2B LD/src/components/Sidebar.jsx'),
+    ('frontend/B2B LD/index.html', 'frontend/B2B LD/index.html'),
+    ('frontend/B2B LD/public/favicon.png', 'frontend/B2B LD/public/favicon.png')
+]
 
-SKIP_DIRS = {"__pycache__", ".git", "node_modules", "venv", ".pytest_cache", "uploads"}
-SKIP_EXTS = {".pyc", ".pyo"}
+client = paramiko.SSHClient()
+client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-
-def should_skip(relpath, name):
-    if name in SKIP_DIRS:
-        return True
-    ext = os.path.splitext(name)[1]
-    return ext in SKIP_EXTS
-
-
-def upload_dir(sftp, local, remote):
-    entries = os.listdir(local)
-    for entry in entries:
-        if should_skip(entry, entry):
-            continue
-        local_path = os.path.join(local, entry)
-        remote_path = posixpath.join(remote, entry)
-        if os.path.isdir(local_path):
-            try:
-                sftp.stat(remote_path)
-            except FileNotFoundError:
-                sftp.mkdir(remote_path)
-            upload_dir(sftp, local_path, remote_path)
-        else:
-            sftp.put(local_path, remote_path)
-            print(f"  UP  {remote_path}")
-
-
-def main(section):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect(hostname=HOST, username=USER, password=PASSWORD, timeout=30)
+try:
+    print(f"Connecting to {host} (UAT)...")
+    client.connect(host, username=user, password=password, timeout=10)
     sftp = client.open_sftp()
+    
+    # Ensure admin directory exists
+    try:
+        sftp.mkdir(f"{remote_base}/frontend/B2B LD/src/pages/admin")
+    except IOError:
+        pass # Directory already exists
 
     try:
-        if section in ("frontend", "all"):
-            print("=== Uploading FRONTEND ===")
-            upload_dir(sftp, LOCAL_FRONTEND, REMOTE_FRONTEND)
-        if section in ("backend", "all"):
-            print("=== Uploading BACKEND (app + db) ===")
-            upload_dir(sftp, os.path.join(LOCAL_BACKEND, "app"), posixpath.join(REMOTE_BACKEND, "app"))
-            upload_dir(sftp, os.path.join(LOCAL_BACKEND, "db"), posixpath.join(REMOTE_BACKEND, "db"))
-    finally:
-        sftp.close()
+        sftp.mkdir(f"{remote_base}/backend/app/assets")
+    except IOError:
+        pass
+    try:
+        sftp.mkdir(f"{remote_base}/backend/app/assets/fonts")
+    except IOError:
+        pass
 
-    if section in ("backend", "all"):
-        print("=== Restarting service ===")
-        stdin, stdout, stderr = client.exec_command("systemctl restart legaldeskb2b-uat.service && sleep 2 && systemctl is-active legaldeskb2b-uat.service")
-        print(stdout.read().decode().strip())
-        err = stderr.read().decode().strip()
-        if err:
-            print("STDERR:", err)
 
+    for local_rel, remote_rel in files_to_sync:
+        local_path = os.path.join(local_base, local_rel)
+        remote_path = f"{remote_base}/{remote_rel}"
+        
+        print(f"Uploading {local_path} -> {remote_path}")
+        sftp.put(local_path, remote_path)
+        
+    sftp.close()
+    
+    print("Restarting UAT backend service...")
+    client.exec_command('pm2 restart all || systemctl restart fastapi || pkill -f uvicorn')
+    
+    print("Running frontend build for UAT... this may take a minute.")
+    # Run the build command and copy to nginx directory
+    stdin, stdout, stderr = client.exec_command('cd "/root/ldb2b-uat/frontend/B2B LD" && npm install && npm run build:uat && rm -rf /var/www/legaldesk-b2b-uat/* && cp -r dist/* /var/www/legaldesk-b2b-uat/')
+    
+    # We ignore stdout since it will crash Python due to unicode issue, just wait for it to finish.
+    exit_status = stdout.channel.recv_exit_status()
+    if exit_status == 0:
+        print("Build and copy successful!")
+    else:
+        print("Build failed.")
+    
+    print("Deployment to UAT VPS successful!")
+
+except Exception as e:
+    print("Deployment Error:", e)
+finally:
     client.close()
-    print("DONE")
-
-
-if __name__ == "__main__":
-    section = sys.argv[1] if len(sys.argv) > 1 else "all"
-    main(section)

@@ -15,6 +15,7 @@ import {
 import { ARTICLE_OPTIONS_BY_STATE, SHCIL_OTF_STATES } from "../../lib/karnatakaArticleCodes";
 import KarnatakaArticleCodePicker from "../../components/KarnatakaArticleCodePicker";
 import { MAHARASHTRA_DISTRICTS, MAHARASHTRA_DISTRICT_NAMES, PROPERTY_AREA_UNITS } from "../../lib/maharashtraEsbtrDistricts";
+import LoanDocumentFlow from "./LoanDocumentFlow";
 
 const inputClass = "w-full px-4 py-2.5 text-sm rounded outline-none transition-all disabled:cursor-not-allowed";
 const inputStyle = baseInputStyle;
@@ -1761,6 +1762,11 @@ const PartnerUserCreateOrder = () => {
     );
   }
 
+  // The Loan Document flow collects a lot of fields (per-type sections,
+  // borrower details, repayment & security) — render it full width instead
+  // of the compact max-w-2xl used by every other order form.
+  const isLoanFlowView = (isDocumentService && selectedDocument && (selectedDocument.category_name === 'Loan Documents' || selectedDocument.doc_name.toLowerCase().includes('loan'))) || (form.service_name && form.service_name.toLowerCase().includes('loan'));
+
   return (
     <div>
       <div className="mb-6 pb-4 border-b" style={{ borderColor: theme.border }}>
@@ -1781,7 +1787,7 @@ const PartnerUserCreateOrder = () => {
         </p>
       </div>
 
-      <div className="rounded-lg p-6 max-w-2xl" style={{ background: theme.card, border: `1px solid ${theme.border}`, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+      <div className={"rounded-lg p-6 " + (isLoanFlowView ? "w-full max-w-none" : "max-w-2xl")} style={{ background: theme.card, border: `1px solid ${theme.border}`, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
         {error && <p className="text-xs font-medium mb-4 px-3 py-2 rounded" style={{ background: theme.goldSoft, color: theme.navy, border: `1px solid ${theme.gold}66` }}>{error}</p>}
 
         {!servicesLoading && services.length === 0 && (
@@ -1829,6 +1835,64 @@ const PartnerUserCreateOrder = () => {
               </div>
             )}
           </>
+        ) : (isDocumentService && selectedDocument && (selectedDocument.category_name === 'Loan Documents' || selectedDocument.doc_name.toLowerCase().includes('loan'))) || (form.service_name && form.service_name.toLowerCase().includes('loan')) ? (
+          <LoanDocumentFlow
+            document={selectedDocument || { doc_name: form.service_name, config_id: null, doc_id: null, available_languages: ["English", "Hindi"] }}
+            ekycService={services.find((s) => s.service_name === "eKYC")}
+            onCancel={() => {
+              if (selectedDocument) setSelectedDocument(null);
+              else setForm(prev => ({ ...prev, service_name: "" }));
+            }}
+            onSubmitOrder={async (loanData) => {
+              setSaving(true);
+              setError("");
+              setEsignError("");
+              try {
+                const fd = new FormData();
+                fd.append("service_name", form.service_name);
+                fd.append("customer_name", loanData.customer_name);
+                if (loanData.customer_email) fd.append("customer_email", loanData.customer_email);
+                fd.append("customer_mobile", loanData.customer_mobile || "9999999999");
+                fd.append("document", loanData.file);
+                if (loanData.loan_details) {
+                  fd.append("loan_details", JSON.stringify(loanData.loan_details));
+                }
+
+                const order = await apiUpload("/api/partner-user/orders", fd);
+                window.dispatchEvent(new Event("wallet:updated"));
+
+                if (loanData.requireEsign) {
+                  try {
+                    // Loan Application flow may pass one signer per party
+                    // (Applicant/Co-Applicant(s)/Guarantor(s) — see
+                    // LoanDocumentFlow.jsx's `signers` array); any other
+                    // Document Service caller falls back to the single
+                    // customer signer, as before.
+                    const signers = loanData.signers?.length ? loanData.signers : [{
+                      name: loanData.customer_name,
+                      mobile: loanData.customer_mobile,
+                      email: loanData.customer_email || null,
+                      position: "bottom-right"
+                    }];
+                    const esign = await apiRequest(`/api/partner-user/orders/${order.id}/esign/initiate`, {
+                      method: "POST",
+                      body: JSON.stringify({ signers }),
+                    });
+                    setResult({ ...order, esign });
+                  } catch (esignErr) {
+                    setEsignError(esignErr.message);
+                    setResult(order);
+                  }
+                } else {
+                  setResult(order);
+                }
+              } catch (err) {
+                setError(err.message);
+              } finally {
+                setSaving(false);
+              }
+            }} 
+          />
         ) : (
           <>
         <SectionLabel>Order Details</SectionLabel>

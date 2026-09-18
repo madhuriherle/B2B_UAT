@@ -130,11 +130,13 @@ def list_configured_documents_summary(organization_id: UUID) -> list[dict[str, A
                 odc.id AS config_id,
                 odc.doc_id,
                 d.doc_name,
+                c.category_name,
                 odc.state_id,
                 s.state_name,
                 odc.base_price
             FROM organization_document_config odc
             JOIN document d ON d.doc_id = odc.doc_id
+            LEFT JOIN category c ON c.category_id = d.category_id
             LEFT JOIN state s ON s.id = odc.state_id
             WHERE odc.organization_id = %s AND odc.status = true
             ORDER BY d.doc_name ASC

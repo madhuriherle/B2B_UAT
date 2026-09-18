@@ -96,8 +96,11 @@ def _get_order_for_esign(connection, order_id: UUID, organization_id: UUID) -> d
     # the create-order form offers this as an opt-in follow-up step. Manual
     # eStamp orders with esign_required go through the same path, driven by
     # Super Admin's "Send for eSign" action instead of a partner-facing form
-    # (see partner.send_manual_estamp_for_esign).
-    if order["service_name"] not in ("eSign", "eStamp", "Manual eStamp"):
+    # (see partner.send_manual_estamp_for_esign). "Document Service" covers
+    # the Loan Document/Application flow (see partner_user.generate_loan_draft
+    # and LoanDocumentFlow.jsx) — those orders are created with that literal
+    # service_name and immediately offer an eSign follow-up the same way.
+    if order["service_name"] not in ("eSign", "eStamp", "Manual eStamp", "Document Service"):
         raise HTTPException(status_code=400, detail="This order cannot be sent for eSign")
     if not order["document_path"]:
         raise HTTPException(status_code=400, detail="Order has no document to send for signature")

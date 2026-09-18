@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel, EmailStr, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validator, model_validator
 
 from app.auth import get_current_partner_user
 from app.database import get_connection, get_transaction
@@ -338,7 +338,9 @@ def list_my_services(current_partner_user: dict[str, Any] = Depends(get_current_
         documents = [
             {
                 "document_config_id": d["config_id"],
+                "doc_id": d["doc_id"],
                 "doc_name": d["doc_name"],
+                "category_name": d["category_name"],
                 "state_id": d["state_id"],
                 "state_name": d["state_name"],
                 "base_price": d["base_price"],
@@ -582,6 +584,534 @@ def preview_my_order_signed_document(
     return _pdf_inline_response(path, require_safe_content=False)
 
 
+
+# =========================================================================
+# Loan Application — multi-party request shape. Every field the customer
+# enters that belongs to a specific person (Applicant/Co-Applicant(s)/
+# Guarantor(s)) lives on a PartyInput; everything else (loan-type-specific
+# fields like vehicle/property/farm details) stays in the flat
+# `dynamic_fields` dict, unchanged from before this was multi-party. See
+# app/loan_i18n.py's FIELD_LABELS for the translated label of every key
+# below, and LoanDocumentFlow.jsx for the matching frontend shape.
+# =========================================================================
+
+class PartyPersonal(BaseModel):
+    full_name: str = ""
+    gender: str = ""
+    date_of_birth: str = ""
+    marital_status: str = ""
+    spouse_name: str = ""
+    father_name: str = ""
+    mother_maiden_name: str = ""
+    category: str = ""
+    religion: str = ""
+    nationality: str = ""
+    residential_status: str = ""
+    no_of_dependents: str = ""
+    occupation: str = ""
+    pan_number: str = ""
+    aadhaar_number: str = ""
+    voter_id: str = ""
+    driving_license: str = ""
+    passport_number: str = ""
+    passport_valid_upto: str = ""
+
+
+class PartyAddressBlock(BaseModel):
+    house_no: str = ""
+    street: str = ""
+    landmark: str = ""
+    city: str = ""
+    district: str = ""
+    state: str = ""
+    pincode: str = ""
+    country: str = ""
+    mobile: str = ""
+    email: str = ""
+
+
+class PartyAddress(BaseModel):
+    present: PartyAddressBlock = Field(default_factory=PartyAddressBlock)
+    # When true (the default), `permanent` is ignored and the PDF only
+    # prints Present Address — mirrors the "Same as present address? Yes/No"
+    # checkbox on every real bank form this was modeled on.
+    permanent_same_as_present: bool = True
+    permanent: PartyAddressBlock | None = None
+    office: PartyAddressBlock | None = None
+
+
+class PartyEmployment(BaseModel):
+    occupation_type: str = ""
+    employer_name: str = ""
+    designation: str = ""
+    department: str = ""
+    employee_no: str = ""
+    employment_status: str = ""
+    organization_type: str = ""
+    total_experience: str = ""
+    years_present_job: str = ""
+    business_name: str = ""
+    business_type: str = ""
+    monthly_income: str = ""
+
+
+class IncomeRow(BaseModel):
+    income_head: str = ""
+    gross_income: str = ""
+    net_income: str = ""
+    frequency: str = ""
+
+
+class ExistingLoanRow(BaseModel):
+    loan_bank: str = ""
+    loan_type: str = ""
+    loan_emi: str = ""
+    loan_tenure: str = ""
+    loan_outstanding: str = ""
+
+
+class BankAccountRow(BaseModel):
+    bank_name: str = ""
+    bank_branch: str = ""
+    account_type: str = ""
+    account_number: str = ""
+
+
+class AssetRow(BaseModel):
+    asset_type: str = ""
+    asset_description: str = ""
+    asset_value: str = ""
+
+
+class ReferenceRow(BaseModel):
+    reference_name: str = ""
+    reference_address: str = ""
+    reference_phone: str = ""
+
+
+class PartyInput(BaseModel):
+    role: Literal["applicant", "co_applicant", "guarantor"]
+    personal: PartyPersonal = Field(default_factory=PartyPersonal)
+    address: PartyAddress = Field(default_factory=PartyAddress)
+    employment: PartyEmployment = Field(default_factory=PartyEmployment)
+    income_sources: list[IncomeRow] = Field(default_factory=list)
+    existing_loans: list[ExistingLoanRow] = Field(default_factory=list)
+    bank_accounts: list[BankAccountRow] = Field(default_factory=list)
+    assets: list[AssetRow] = Field(default_factory=list)
+    references: list[ReferenceRow] = Field(default_factory=list)
+
+
+class LoanDraftRequest(BaseModel):
+    document_name: str
+    language: str
+    loan_amount: str
+    tenure: str
+    interest_rate: str = "12"
+    repayment_frequency: str = "Monthly"
+    dynamic_fields: dict = Field(default_factory=dict)
+    parties: list[PartyInput] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _require_one_applicant(self):
+        applicants = [p for p in self.parties if p.role == "applicant"]
+        if len(applicants) != 1:
+            raise ValueError("Exactly one party with role 'applicant' is required")
+        return self
+
+
+def _add_months(d, months: int):
+    """Calendar month-add with no external dependency — clamps the day to
+    the target month's real length (e.g. Jan 31 + 1 month -> Feb 28/29)."""
+    month_index = d.month - 1 + months
+    year = d.year + month_index // 12
+    month = month_index % 12 + 1
+    days_in_month = [31, 29 if (year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)) else 28,
+                      31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    day = min(d.day, days_in_month[month - 1])
+    return d.replace(year=year, month=month, day=day)
+
+
+def _calc_emi(principal: str, annual_rate_pct: str, months: str) -> float | None:
+    """Standard reducing-balance EMI formula. None on unparseable input
+    (left blank in the document rather than guessing)."""
+    try:
+        p = float(principal)
+        r = float(annual_rate_pct) / 12 / 100
+        n = int(float(months))
+    except (TypeError, ValueError):
+        return None
+    if p <= 0 or n <= 0:
+        return None
+    if r == 0:
+        return round(p / n, 2)
+    factor = (1 + r) ** n
+    return round(p * r * factor / (factor - 1), 2)
+
+
+def _mask_aadhaar(value: str) -> str:
+    """Never print a full Aadhaar number — UIDAI masking convention (last 4
+    digits only), same rule the eKYC result display already applies
+    client-side (see lib/ekycFields.js)."""
+    digits = "".join(ch for ch in str(value) if ch.isdigit())
+    if len(digits) >= 4:
+        return f"XXXX XXXX {digits[-4:]}"
+    return str(value)
+
+
+@router.post("/loans/generate_draft")
+def generate_loan_draft(
+    req: LoanDraftRequest,
+    current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
+):
+    import io
+    import uuid
+    from datetime import datetime
+    from xml.sax.saxutils import escape as xml_escape
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from fastapi.responses import Response
+    from app.loan_i18n import get_loan_fonts, get_loan_i18n, get_field_label, get_loan_type_config, get_application_no_prefix
+
+    font_regular, font_bold = get_loan_fonts(req.language)
+    t = get_loan_i18n(req.language)
+    type_config = get_loan_type_config(req.document_name)
+
+    # The vendored per-script Noto fonts (like Google Fonts' subsets
+    # generally) only cover their own script plus digits/punctuation — no
+    # Latin A-Z/a-z glyphs. Everything a partner user actually types
+    # (customer name, VIN, vehicle make/model, Rs. prefix) is virtually
+    # always Latin script regardless of the chosen document language, so it
+    # must render in Helvetica explicitly rather than the translated font,
+    # or it silently disappears. escape() guards against user input (a name
+    # containing "<"/"&") breaking — or manipulating — this Paragraph markup.
+    def latin(text, bold=False):
+        face = "Helvetica-Bold" if bold else "Helvetica"
+        return f'<font face="{face}">{xml_escape(str(text))}</font>'
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=48,
+        leftMargin=48,
+        topMargin=48,
+        bottomMargin=48
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'TitleStyle', parent=styles['Heading1'], fontName=font_bold, fontSize=18, alignment=1, spaceAfter=24,
+    )
+    heading_style = ParagraphStyle(
+        'HeadingStyle', parent=styles['Heading2'], fontName=font_bold, fontSize=12, spaceBefore=16, spaceAfter=8,
+    )
+    normal_style = ParagraphStyle(
+        'NormalStyle', parent=styles['Normal'], fontName=font_regular, fontSize=11, leading=16, spaceAfter=10,
+    )
+    # Base style for table cells that mix the translated font with an
+    # explicit <font face="Helvetica"> run via latin() above — the cell's
+    # own fontName barely matters since every character ends up inside one
+    # explicit <font> tag or another, but ReportLab still requires a base
+    # style to construct the Paragraph.
+    cell_style = ParagraphStyle('CellStyle', parent=styles['Normal'], fontName=font_regular, fontSize=11, leading=14)
+
+    sub_label_style = ParagraphStyle(
+        'SubLabelStyle', parent=styles['Normal'], fontName=font_bold, fontSize=10.5, spaceBefore=4, spaceAfter=4,
+    )
+    party_style = ParagraphStyle(
+        'PartyStyle', parent=styles['Heading1'], fontName=font_bold, fontSize=14, spaceBefore=20, spaceAfter=6,
+        textColor=colors.HexColor('#1E6091'),
+    )
+
+    def kv_table(pairs):
+        """pairs: list of (translated_label, already-markup-safe value
+        string). Skips any pair whose value is empty/None."""
+        rows = [[label, Paragraph(value, cell_style)] for label, value in pairs if value not in (None, "")]
+        if not rows:
+            return None
+        table = Table(rows, colWidths=[170, 330])
+        table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), font_bold),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        return table
+
+    def dyn_rows(source: dict, keys):
+        """Pulls the given keys out of `source` — either req.dynamic_fields
+        for loan-level fields, or a party sub-model's .model_dump() for
+        per-party fields — in the given fixed order, translating each label.
+        An unrecognized key still renders, just title-cased. Missing/blank
+        keys are simply omitted."""
+        out = []
+        for k in keys:
+            v = source.get(k)
+            if v in (None, ""):
+                continue
+            label = (get_field_label(req.language, k) or k.replace("_", " ").title()) + ":"
+            if k == "aadhaar_number":
+                v = _mask_aadhaar(v)
+            out.append((label, latin(v)))
+        return out
+
+    def rows_table(col_keys, rows):
+        """Renders a repeatable-row party section (Income/Existing Loans/
+        Bank Accounts/Assets/References) with translated column headers.
+        None if `rows` is empty or every row in it is entirely blank."""
+        if not rows:
+            return None
+        headers = [get_field_label(req.language, k) or k.replace("_", " ").title() for k in col_keys]
+        data = [headers]
+        for row in rows:
+            row_d = row.model_dump()
+            if all(row_d.get(k) in (None, "") for k in col_keys):
+                continue
+            data.append([Paragraph(latin(row_d.get(k) or ""), cell_style) for k in col_keys])
+        if len(data) == 1:
+            return None
+        col_width = 500 / len(col_keys)
+        table = Table(data, colWidths=[col_width] * len(col_keys))
+        table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), font_bold),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('PADDING', (0, 0), (-1, -1), 6),
+        ]))
+        return table
+
+    # Computed values — application/account numbers are cosmetic document
+    # references only (no backing "loan account" entity exists yet in this
+    # system), regenerated fresh on every draft rather than persisted.
+    application_no = f"{get_application_no_prefix(req.document_name)}-{uuid.uuid4().hex[:8].upper()}"
+    account_no = f"{get_application_no_prefix(req.document_name)}A-{uuid.uuid4().hex[:8].upper()}"
+    agreement_date = datetime.now()
+    emi = _calc_emi(req.loan_amount, req.interest_rate, req.tenure)
+    first_emi_date = _add_months(agreement_date, 1)
+    try:
+        final_emi_date = _add_months(agreement_date, int(float(req.tenure)))
+    except (TypeError, ValueError):
+        final_emi_date = None
+    date_format = "%B %d, %Y" if req.language == "English" else "%d/%m/%Y"
+
+    # `parties` always has exactly one "applicant" (enforced by
+    # LoanDraftRequest._require_one_applicant); Terms clause 1 names the
+    # Applicant plus any Co-Applicants as "the Borrower(s)" — Guarantors are
+    # a separate party to the Agreement, not named there.
+    applicant = next(p for p in req.parties if p.role == "applicant")
+    co_applicant_names = [p.personal.full_name for p in req.parties if p.role == "co_applicant" and p.personal.full_name]
+    borrower_names = applicant.personal.full_name or "Customer"
+    if co_applicant_names:
+        borrower_names += " and " + ", ".join(co_applicant_names)
+
+    story = []
+
+    # Title — document_name (e.g. "Car Loan") is always the English name
+    # from the shared `document` catalog table, never translated.
+    story.append(Paragraph(f"{latin(req.document_name.upper(), bold=True)} {t['title_suffix']}", title_style))
+
+    # Loan Details — the letterhead-style summary block.
+    ldf = t["loan_details_fields"]
+    loan_details_table = kv_table([
+        (ldf["agreement_date"], latin(agreement_date.strftime(date_format))),
+        (ldf["application_no"], latin(application_no)),
+        (ldf["account_no"], latin(account_no)),
+        (ldf["loan_amount"], latin(f"Rs. {req.loan_amount}")),
+        (ldf["interest_rate"], latin(f"{req.interest_rate}% p.a.")),
+        (ldf["tenure"], f"{latin(req.tenure)} {t['months']}"),
+        (ldf["repayment_frequency"], latin(req.repayment_frequency)),
+        (ldf["emi_amount"], latin(f"Rs. {emi}") if emi is not None else None),
+        (ldf["loan_purpose"], latin(req.document_name)),
+    ])
+    if loan_details_table:
+        story.append(Paragraph(t["section_headings"]["loan_details"], heading_style))
+        story.append(loan_details_table)
+        story.append(Spacer(1, 12))
+
+    # One Form-A/Form-B style block per party — Applicant first, then every
+    # Co-Applicant, then every Guarantor, regardless of the order they were
+    # added in the UI (mirrors the real bank forms this was modeled on).
+    ADDRESS_KEYS = [
+        "house_no", "street", "landmark", "city", "district", "state", "pincode", "country", "mobile", "email",
+    ]
+    PERSONAL_KEYS = [
+        "full_name", "gender", "date_of_birth", "marital_status", "spouse_name", "father_name",
+        "mother_maiden_name", "category", "religion", "nationality", "residential_status",
+        "no_of_dependents", "occupation", "pan_number", "aadhaar_number", "voter_id",
+        "driving_license", "passport_number", "passport_valid_upto",
+    ]
+    EMPLOYMENT_KEYS = [
+        "occupation_type", "employer_name", "designation", "department", "employee_no",
+        "employment_status", "organization_type", "total_experience", "years_present_job",
+        "business_name", "business_type", "monthly_income",
+    ]
+
+    role_order = ["applicant", "co_applicant", "guarantor"]
+    ordered_parties = sorted(req.parties, key=lambda p: role_order.index(p.role))
+    role_total = {role: sum(1 for p in ordered_parties if p.role == role) for role in role_order}
+    role_seen: dict[str, int] = {}
+    signature_entries = []  # (caption, latin-wrapped name) per party, for the Signatures section below
+
+    for party in ordered_parties:
+        role_suffix = ""
+        if party.role != "applicant":
+            role_seen[party.role] = role_seen.get(party.role, 0) + 1
+            if role_total[party.role] > 1:
+                role_suffix = f" {role_seen[party.role]}"
+        signature_entries.append(
+            (t["signature_captions"][party.role] + role_suffix, latin(party.personal.full_name))
+        )
+
+        story.append(Paragraph(t["party_roles"][party.role] + role_suffix, party_style))
+
+        personal_table = kv_table(dyn_rows(party.personal.model_dump(), PERSONAL_KEYS))
+        if personal_table:
+            story.append(Paragraph(t["section_headings"]["personal_kyc"], heading_style))
+            story.append(personal_table)
+            story.append(Spacer(1, 10))
+
+        present_table = kv_table(dyn_rows(party.address.present.model_dump(), ADDRESS_KEYS))
+        permanent_table = None
+        if not party.address.permanent_same_as_present and party.address.permanent:
+            permanent_table = kv_table(dyn_rows(party.address.permanent.model_dump(), ADDRESS_KEYS))
+        office_table = None
+        if party.address.office:
+            office_table = kv_table(dyn_rows(party.address.office.model_dump(), ADDRESS_KEYS))
+        if present_table or permanent_table or office_table:
+            story.append(Paragraph(t["section_headings"]["address"], heading_style))
+            if present_table:
+                story.append(Paragraph(t["present_address"], sub_label_style))
+                story.append(present_table)
+                story.append(Spacer(1, 6))
+            if permanent_table:
+                story.append(Paragraph(t["permanent_address"], sub_label_style))
+                story.append(permanent_table)
+                story.append(Spacer(1, 6))
+            if office_table:
+                story.append(Paragraph(t["office_address"], sub_label_style))
+                story.append(office_table)
+            story.append(Spacer(1, 10))
+
+        employment_table = kv_table(dyn_rows(party.employment.model_dump(), EMPLOYMENT_KEYS))
+        if employment_table:
+            story.append(Paragraph(t["section_headings"]["party_employment"], heading_style))
+            story.append(employment_table)
+            story.append(Spacer(1, 10))
+
+        for section_key, col_keys, rows in [
+            ("income_sources", ["income_head", "gross_income", "net_income", "frequency"], party.income_sources),
+            ("party_existing_loans",
+             ["loan_bank", "loan_type", "loan_emi", "loan_tenure", "loan_outstanding"], party.existing_loans),
+            ("party_bank_accounts",
+             ["bank_name", "bank_branch", "account_type", "account_number"], party.bank_accounts),
+            ("party_assets", ["asset_type", "asset_description", "asset_value"], party.assets),
+            ("party_references",
+             ["reference_name", "reference_address", "reference_phone"], party.references),
+        ]:
+            table = rows_table(col_keys, rows)
+            if table:
+                story.append(Paragraph(t["section_headings"][section_key], heading_style))
+                story.append(table)
+                story.append(Spacer(1, 10))
+
+    # Loan-type-specific section(s) — Property/Vehicle/Financial/Farm+Crop,
+    # per LOAN_TYPE_CONFIG. These describe the loan itself, not a party, so
+    # they stay in the flat req.dynamic_fields dict.
+    for section_key, field_keys in type_config["sections"]:
+        section_table = kv_table(dyn_rows(req.dynamic_fields, field_keys))
+        if section_table:
+            story.append(Paragraph(t["section_headings"][section_key], heading_style))
+            story.append(section_table)
+            story.append(Spacer(1, 12))
+
+    # Repayment & Security — computed EMI dates plus the type-specific
+    # security fields (mortgage/hypothecation/collateral/...).
+    repayment_rows = []
+    if emi is not None:
+        repayment_rows.append((t["first_emi_date"], latin(first_emi_date.strftime(date_format))))
+        if final_emi_date:
+            repayment_rows.append((t["final_emi_date"], latin(final_emi_date.strftime(date_format))))
+    repayment_rows += dyn_rows(req.dynamic_fields, type_config["repayment_security"])
+    repayment_table = kv_table(repayment_rows)
+    if repayment_table:
+        story.append(Paragraph(t["section_headings"]["repayment_security"], heading_style))
+        story.append(repayment_table)
+        story.append(Spacer(1, 12))
+
+    # 10 numbered Terms clauses — {name} is the only user data embedded
+    # mid-paragraph in the translated boilerplate, so it's the only run
+    # that needs the explicit Helvetica wrap.
+    story.append(Spacer(1, 8))
+    for i, heading in enumerate(t["terms_headings"][:-1], start=1):  # last one is Signatures, handled separately
+        story.append(Paragraph(heading, heading_style))
+        body = t["terms_bodies"][i]
+        if i == 1:
+            body = body.format(name=latin(borrower_names, bold=True))
+        story.append(Paragraph(body, normal_style))
+
+    story.append(Spacer(1, 30))
+
+    # Signatures — one column per party, chunked 3-wide (mirrors how SBI's
+    # own forms lay Applicant/Co-Applicant/Guarantor signature lines out
+    # side by side), plus a final standalone line for the Lender.
+    story.append(Paragraph(t["terms_headings"][-1], heading_style))
+    story.append(Paragraph(t["witness"], normal_style))
+    story.append(Spacer(1, 30))
+
+    def sig_block(entries):
+        """entries: list of (caption, already-markup-safe name string)."""
+        col_width = 500 / len(entries)
+        line_row = ["_________________________"] * len(entries)
+        caption_row = [caption for caption, _ in entries]
+        name_row = [Paragraph(f"{t['name_label']} {name}", cell_style) for _, name in entries]
+        table = Table([line_row, caption_row, name_row], colWidths=[col_width] * len(entries))
+        table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica'),
+            ('FONTNAME', (0, 1), (-1, 1), font_regular),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        return table
+
+    for i in range(0, len(signature_entries), 3):
+        story.append(sig_block(signature_entries[i:i + 3]))
+        story.append(Spacer(1, 20))
+    story.append(sig_block([(t["lender_signatory"], t["lender_name"])]))
+
+    # Build PDF
+    doc.build(story)
+
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    return Response(content=pdf_bytes, media_type="application/pdf")
+
+
+@router.get("/loans/documents")
+def get_loan_document_checklist(
+    document_name: str,
+    current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
+) -> list[dict[str, Any]]:
+    """Document checklist for a loan type — hardcoded per loan type (see
+    app/loan_i18n.py's DOCUMENT_CHECKLISTS), the same way every other part
+    of this flow's field set is (LOAN_TYPE_CONFIG). There's a separate
+    admin-managed `loan_document_config` DB table with full CRUD
+    (app/routes/loan_documents.py) that could drive this instead, but no
+    admin screen anywhere in this app writes to it, so depending on it
+    would just show every partner user an empty checklist. Used by the Loan
+    Application flow's Documents Checklist step; each item's
+    `applicant_type` says which party roles (applicant/co_applicant/
+    guarantor) it applies to, so the frontend filters to only the roles
+    actually present on this application."""
+    from app.loan_i18n import get_default_document_checklist
+
+    return get_default_document_checklist(document_name)
+
 @router.post("/orders", status_code=201)
 async def create_my_order(
     service_name: str = Form(...),
@@ -593,6 +1123,7 @@ async def create_my_order(
     quantity: int = Form(1),
     doc_type: str | None = Form(None),
     bulk_ekyc_record_id: UUID | None = Form(None),
+    loan_details: str | None = Form(None),
     current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
 ) -> dict[str, Any]:
     # organization_user_id is always the caller's own membership — a Partner
@@ -601,6 +1132,12 @@ async def create_my_order(
     # orgs (Cyber Shop accounts); a Retailer's member IS the organization, so
     # it may use any service Super Admin activated for the org — see
     # list_my_services above.
+    parsed_loan_details: dict[str, Any] | None = None
+    if loan_details:
+        try:
+            parsed_loan_details = json.loads(loan_details)
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail="loan_details must be valid JSON") from e
     return await _create_order(
         service_name=service_name,
         customer_name=customer_name,
@@ -614,6 +1151,7 @@ async def create_my_order(
         quantity=quantity,
         document_type=doc_type,
         bulk_ekyc_record_id=bulk_ekyc_record_id,
+        loan_details=parsed_loan_details,
     )
 
 

@@ -617,13 +617,16 @@ def list_partner_user_services(
             """
             SELECT
                 odc.id AS document_config_id,
+                d.doc_id,
                 d.doc_name,
+                c.category_name,
                 odc.state_id,
                 s.state_name,
                 odc.base_price,
                 (pus.id IS NOT NULL) AS assigned
             FROM organization_document_config odc
             JOIN document d ON d.doc_id = odc.doc_id
+            LEFT JOIN category c ON c.category_id = d.category_id
             LEFT JOIN state s ON s.id = odc.state_id
             LEFT JOIN partner_user_services pus
                 ON pus.document_config_id = odc.id AND pus.organization_user_id = %(membership_id)s
@@ -1461,6 +1464,146 @@ def _convert_partial_block_to_debit(
     )
 
 
+def _to_decimal(value: Any) -> float | None:
+    try:
+        if value in (None, ""):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_int(value: Any) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _persist_loan_application(connection, order_id: UUID, loan_details: dict[str, Any]) -> None:
+    """Normalized mirror of orders.loan_details (see schema.sql's "LOAN
+    APPLICATIONS" section) — written alongside the JSONB column, inside the
+    same transaction as the orders INSERT in _create_order, so a Loan
+    Application order either has both or neither, never one without the
+    other. loan_details with no 'parties' list (every non-loan-application
+    order — the field is reused generically) is a no-op. Field names below
+    match LoanDocumentFlow.jsx's `loan_details` shape / partner_user.py's
+    PartyInput and its sub-models 1:1, since both sides of this pipe are
+    owned together."""
+    parties = loan_details.get("parties") or []
+    if not parties:
+        return
+
+    application = connection.execute(
+        """
+        INSERT INTO loan_applications (
+            order_id, loan_type_document_name, language, loan_amount, tenure_months,
+            interest_rate, repayment_frequency, loan_type_fields, documents_checklist
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+        """,
+        (
+            order_id,
+            loan_details.get("loan_type"),
+            loan_details.get("language"),
+            _to_decimal(loan_details.get("loan_amount")),
+            _to_int(loan_details.get("tenure_months")),
+            _to_decimal(loan_details.get("interest_rate")),
+            loan_details.get("repayment_frequency"),
+            Jsonb(loan_details.get("loan_type_fields") or {}),
+            Jsonb(loan_details.get("documents_checklist") or []),
+        ),
+    ).fetchone()
+    application_id = application["id"]
+
+    for party in parties:
+        personal = party.get("personal") or {}
+        address = party.get("address") or {}
+        employment = party.get("employment") or {}
+        party_row = connection.execute(
+            """
+            INSERT INTO loan_application_parties (
+                loan_application_id, role,
+                full_name, gender, date_of_birth, marital_status, spouse_name, father_name,
+                mother_maiden_name, category, religion, nationality, residential_status,
+                no_of_dependents, occupation, pan_number, aadhaar_number, voter_id,
+                driving_license, passport_number, passport_valid_upto,
+                present_address, permanent_same_as_present, permanent_address, office_address,
+                occupation_type, employer_name, designation, department, employee_no,
+                employment_status, organization_type, total_experience, years_present_job,
+                business_name, business_type, monthly_income
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            )
+            RETURNING id
+            """,
+            (
+                application_id, party.get("role"),
+                personal.get("full_name"), personal.get("gender"), personal.get("date_of_birth"),
+                personal.get("marital_status"), personal.get("spouse_name"), personal.get("father_name"),
+                personal.get("mother_maiden_name"), personal.get("category"), personal.get("religion"),
+                personal.get("nationality"), personal.get("residential_status"),
+                personal.get("no_of_dependents"), personal.get("occupation"), personal.get("pan_number"),
+                personal.get("aadhaar_number"), personal.get("voter_id"), personal.get("driving_license"),
+                personal.get("passport_number"), personal.get("passport_valid_upto"),
+                Jsonb(address.get("present") or {}), bool(address.get("permanent_same_as_present", True)),
+                Jsonb(address["permanent"]) if address.get("permanent") else None,
+                Jsonb(address["office"]) if address.get("office") else None,
+                employment.get("occupation_type"), employment.get("employer_name"),
+                employment.get("designation"), employment.get("department"), employment.get("employee_no"),
+                employment.get("employment_status"), employment.get("organization_type"),
+                employment.get("total_experience"), employment.get("years_present_job"),
+                employment.get("business_name"), employment.get("business_type"),
+                _to_decimal(employment.get("monthly_income")),
+            ),
+        ).fetchone()
+        party_id = party_row["id"]
+
+        for row in party.get("income_sources") or []:
+            connection.execute(
+                """INSERT INTO loan_application_party_income
+                   (party_id, income_head, gross_income, net_income, frequency)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (party_id, row.get("income_head"), _to_decimal(row.get("gross_income")),
+                 _to_decimal(row.get("net_income")), row.get("frequency")),
+            )
+        for row in party.get("existing_loans") or []:
+            connection.execute(
+                """INSERT INTO loan_application_party_existing_loans
+                   (party_id, loan_bank, loan_type, loan_emi, loan_tenure, loan_outstanding)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (party_id, row.get("loan_bank"), row.get("loan_type"), _to_decimal(row.get("loan_emi")),
+                 row.get("loan_tenure"), _to_decimal(row.get("loan_outstanding"))),
+            )
+        for row in party.get("bank_accounts") or []:
+            connection.execute(
+                """INSERT INTO loan_application_party_bank_accounts
+                   (party_id, bank_name, bank_branch, account_type, account_number)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (party_id, row.get("bank_name"), row.get("bank_branch"), row.get("account_type"),
+                 row.get("account_number")),
+            )
+        for row in party.get("assets") or []:
+            connection.execute(
+                """INSERT INTO loan_application_party_assets
+                   (party_id, asset_type, asset_description, asset_value)
+                   VALUES (%s, %s, %s, %s)""",
+                (party_id, row.get("asset_type"), row.get("asset_description"),
+                 _to_decimal(row.get("asset_value"))),
+            )
+        for row in party.get("references") or []:
+            connection.execute(
+                """INSERT INTO loan_application_party_references
+                   (party_id, reference_name, reference_address, reference_phone)
+                   VALUES (%s, %s, %s, %s)""",
+                (party_id, row.get("reference_name"), row.get("reference_address"),
+                 row.get("reference_phone")),
+            )
+
+
 async def _create_order(
     *,
     service_name: str,
@@ -1491,6 +1634,10 @@ async def _create_order(
     # the real order atomically, in the same transaction as the order
     # insert below, so the link can never be partial.
     bulk_ekyc_record_id: UUID | None = None,
+    # Set only by the Loan Document flow (partner_user.py's /orders, called
+    # with the JSON-encoded structured fields the customer entered — see
+    # LoanDocumentFlow.jsx) — every other caller omits it.
+    loan_details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if service_name not in get_active_service_names():
         raise HTTPException(status_code=400, detail=f"Unknown service '{service_name}'")
@@ -1663,20 +1810,25 @@ async def _create_order(
             INSERT INTO orders (
                 order_no, organization_id, organization_user_id, customer_name, customer_email, customer_mobile,
                 service_name, document_type, document_filename, document_path, amount, quantity, status,
-                esign_price_per_signer, updated_at
+                esign_price_per_signer, loan_details, updated_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now())
             RETURNING
                 id, order_no, organization_id, organization_user_id, customer_name, customer_email, customer_mobile,
-                service_name, document_type, document_filename, amount, quantity, status, created_at, updated_at
+                service_name, document_type, document_filename, amount, quantity, status, loan_details, created_at, updated_at
             """,
             (
                 order_no, organization_id, organization_user_id, customer_name,
                 str(customer_email) if customer_email else None, customer_mobile,
                 service_name, document_type, display_filename, stored_name, amount, quantity, status,
-                esign_price_per_signer,
+                esign_price_per_signer, Jsonb(loan_details) if loan_details is not None else None,
             ),
         ).fetchone()
+
+        # Normalized mirror of loan_details, for Loan Application orders
+        # only (no-op for every other order — see _persist_loan_application).
+        if loan_details:
+            _persist_loan_application(connection, order["id"], loan_details)
 
         # Authoritative snapshot of eKYC's full charge breakdown at
         # order-creation time — the base price too, not just the additional

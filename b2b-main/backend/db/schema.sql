@@ -899,6 +899,14 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS quantity INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancellation_reason TEXT;
 CREATE SEQUENCE IF NOT EXISTS orders_order_no_seq START 1;
 
+-- Structured snapshot of whatever the customer entered on the Loan Document
+-- flow (loan_type, language, loan_amount, tenure_months, plus loan-type-
+-- specific fields like vehicle_make/property_address/farm_location) — see
+-- LoanDocumentFlow.jsx. Previously this data only existed baked into the
+-- generated PDF's text and in transient React state; NULL for every
+-- non-loan order.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS loan_details JSONB;
+
 -- eStamp reimbursement wallet model — set true only when this order's real
 -- stamp/denomination value was actually deducted from the wallet under the
 -- new prefunded-wallet flow (see stamp_service.initiate_stamp and
@@ -2319,3 +2327,165 @@ SELECT
     'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct'
 
 WHERE NOT EXISTS (SELECT 1 FROM invoice_terms_settings);
+
+
+-- =========================================
+-- LOAN APPLICATIONS — normalized storage for the multi-party Loan
+-- Application flow (see LoanDocumentFlow.jsx / app/routes/partner_user.py's
+-- PartyInput and its sub-models). Written by _create_order
+-- (app/routes/partner.py) inside the same transaction as the orders INSERT,
+-- alongside (not instead of) orders.loan_details JSONB — that column stays
+-- the source of truth the generated PDF/draft flow round-trips through;
+-- these tables exist so future features (search/report across
+-- applications by party) can query with plain SQL instead of JSONB paths.
+-- One loan_applications row per loan order (1:1 with orders, like
+-- b2b_esign_transaction); one loan_application_parties row per
+-- Applicant/Co-Applicant/Guarantor; the five *_party_* tables hold that
+-- party's repeatable-row sections (Income/Existing Loans/Bank
+-- Accounts/Assets/References). Addresses and loan-type-specific fields
+-- (vehicle/property/farm) stay as JSONB sub-objects — nothing queries by
+-- street name or by a farm's irrigation type, so normalizing those further
+-- buys nothing.
+-- =========================================
+
+CREATE TABLE IF NOT EXISTS loan_applications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    order_id UUID NOT NULL UNIQUE
+        REFERENCES orders(id)
+        ON DELETE CASCADE,
+
+    loan_type_document_name VARCHAR(150),
+    language VARCHAR(20),
+    loan_amount NUMERIC(14,2),
+    tenure_months INTEGER,
+    interest_rate NUMERIC(6,3),
+    repayment_frequency VARCHAR(20),
+
+    -- Vehicle/property/farm details (LOAN_TYPE_CONFIG's per-type dynamic
+    -- fields) and the confirmed documents checklist — both genuinely
+    -- variable-shaped per loan type, kept as JSONB rather than columns.
+    loan_type_fields JSONB,
+    documents_checklist JSONB,
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_loan_applications_order_id ON loan_applications(order_id);
+
+CREATE TABLE IF NOT EXISTS loan_application_parties (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    loan_application_id UUID NOT NULL
+        REFERENCES loan_applications(id)
+        ON DELETE CASCADE,
+
+    role VARCHAR(20) NOT NULL CHECK (role IN ('applicant', 'co_applicant', 'guarantor')),
+
+    -- Personal / KYC — mirrors PartyPersonal in partner_user.py field-for-field.
+    full_name VARCHAR(255),
+    gender VARCHAR(20),
+    date_of_birth VARCHAR(20),
+    marital_status VARCHAR(20),
+    spouse_name VARCHAR(255),
+    father_name VARCHAR(255),
+    mother_maiden_name VARCHAR(255),
+    category VARCHAR(20),
+    religion VARCHAR(50),
+    nationality VARCHAR(50),
+    residential_status VARCHAR(30),
+    no_of_dependents VARCHAR(10),
+    occupation VARCHAR(100),
+    pan_number VARCHAR(20),
+    aadhaar_number VARCHAR(20),
+    voter_id VARCHAR(30),
+    driving_license VARCHAR(30),
+    passport_number VARCHAR(30),
+    passport_valid_upto VARCHAR(20),
+
+    -- Address — mirrors PartyAddress/PartyAddressBlock; kept as JSONB
+    -- sub-objects (see note above).
+    present_address JSONB,
+    permanent_same_as_present BOOLEAN DEFAULT true,
+    permanent_address JSONB,
+    office_address JSONB,
+
+    -- Employment / Business — mirrors PartyEmployment field-for-field.
+    occupation_type VARCHAR(40),
+    employer_name VARCHAR(255),
+    designation VARCHAR(100),
+    department VARCHAR(100),
+    employee_no VARCHAR(50),
+    employment_status VARCHAR(30),
+    organization_type VARCHAR(40),
+    total_experience VARCHAR(30),
+    years_present_job VARCHAR(30),
+    business_name VARCHAR(255),
+    business_type VARCHAR(40),
+    monthly_income NUMERIC(14,2),
+
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_loan_application_parties_application_id ON loan_application_parties(loan_application_id);
+CREATE INDEX IF NOT EXISTS idx_loan_application_parties_pan ON loan_application_parties(pan_number);
+CREATE INDEX IF NOT EXISTS idx_loan_application_parties_aadhaar ON loan_application_parties(aadhaar_number);
+
+-- Repeatable-row sections — mirrors IncomeRow/ExistingLoanRow/BankAccountRow/
+-- AssetRow/ReferenceRow in partner_user.py, one table each.
+
+CREATE TABLE IF NOT EXISTS loan_application_party_income (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    party_id UUID NOT NULL REFERENCES loan_application_parties(id) ON DELETE CASCADE,
+    income_head VARCHAR(100),
+    gross_income NUMERIC(14,2),
+    net_income NUMERIC(14,2),
+    frequency VARCHAR(20),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_loan_application_party_income_party_id ON loan_application_party_income(party_id);
+
+CREATE TABLE IF NOT EXISTS loan_application_party_existing_loans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    party_id UUID NOT NULL REFERENCES loan_application_parties(id) ON DELETE CASCADE,
+    loan_bank VARCHAR(255),
+    loan_type VARCHAR(100),
+    loan_emi NUMERIC(14,2),
+    loan_tenure VARCHAR(30),
+    loan_outstanding NUMERIC(14,2),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_loan_application_party_existing_loans_party_id ON loan_application_party_existing_loans(party_id);
+
+CREATE TABLE IF NOT EXISTS loan_application_party_bank_accounts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    party_id UUID NOT NULL REFERENCES loan_application_parties(id) ON DELETE CASCADE,
+    bank_name VARCHAR(255),
+    bank_branch VARCHAR(255),
+    account_type VARCHAR(30),
+    account_number VARCHAR(50),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_loan_application_party_bank_accounts_party_id ON loan_application_party_bank_accounts(party_id);
+
+CREATE TABLE IF NOT EXISTS loan_application_party_assets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    party_id UUID NOT NULL REFERENCES loan_application_parties(id) ON DELETE CASCADE,
+    asset_type VARCHAR(30),
+    asset_description VARCHAR(255),
+    asset_value NUMERIC(14,2),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_loan_application_party_assets_party_id ON loan_application_party_assets(party_id);
+
+CREATE TABLE IF NOT EXISTS loan_application_party_references (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    party_id UUID NOT NULL REFERENCES loan_application_parties(id) ON DELETE CASCADE,
+    reference_name VARCHAR(255),
+    reference_address VARCHAR(500),
+    reference_phone VARCHAR(20),
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_loan_application_party_references_party_id ON loan_application_party_references(party_id);

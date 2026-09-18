@@ -65,6 +65,15 @@ const STATE_DISTRICTS = {
   "Uttar Pradesh": ["Agra", "Aligarh", "Ambedkar Nagar", "Amethi", "Amroha", "Auraiya", "Ayodhya", "Azamgarh", "Baghpat", "Bahraich", "Ballia", "Balrampur", "Banda", "Barabanki", "Bareilly", "Basti", "Bhadohi", "Bijnor", "Budaun", "Bulandshahr", "Chandauli", "Chitrakoot", "Deoria", "Etah", "Etawah", "Farrukhabad", "Fatehpur", "Firozabad", "Gautam Buddha Nagar", "Ghaziabad", "Ghazipur", "Gonda", "Gorakhpur", "Hamirpur", "Hapur", "Hardoi", "Hathras", "Jalaun", "Jaunpur", "Jhansi", "Kannauj", "Kanpur Dehat", "Kanpur Nagar", "Kasganj", "Kaushambi", "Kushinagar", "Lakhimpur Kheri", "Lalitpur", "Lucknow", "Maharajganj", "Mahoba", "Mainpuri", "Mathura", "Mau", "Meerut", "Mirzapur", "Moradabad", "Muzaffarnagar", "Pilibhit", "Pratapgarh", "Prayagraj", "Rae Bareli", "Rampur", "Saharanpur", "Sambhal", "Sant Kabir Nagar", "Shahjahanpur", "Shamli", "Shravasti", "Siddharthnagar", "Sitapur", "Sonbhadra", "Sultanpur", "Unnao", "Varanasi"],
   "Uttarakhand": ["Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", "Haridwar", "Nainital", "Pauri Garhwal", "Pithoragarh", "Rudraprayag", "Tehri Garhwal", "Udham Singh Nagar", "Uttarkashi"],
   "West Bengal": ["Alipurduar", "Bankura", "Paschim Bardhaman", "Purba Bardhaman", "Birbhum", "Cooch Behar", "Dakshin Dinajpur", "Darjeeling", "Hooghly", "Howrah", "Jalpaiguri", "Jhargram", "Kalimpong", "Kolkata", "Maldah", "Murshidabad", "Nadia", "North 24 Parganas", "Paschim Medinipur", "Purba Medinipur", "South 24 Parganas", "Uttar Dinajpur"],
+  // Union Territories — far fewer districts each, standard/stable list.
+  "Andaman and Nicobar Islands": ["Nicobar", "North and Middle Andaman", "South Andaman"],
+  "Chandigarh": ["Chandigarh"],
+  "Dadra and Nagar Haveli and Daman and Diu": ["Dadra and Nagar Haveli", "Daman", "Diu"],
+  "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "North East Delhi", "North West Delhi", "Shahdara", "South Delhi", "South East Delhi", "South West Delhi", "West Delhi"],
+  "Jammu and Kashmir": ["Anantnag", "Bandipora", "Baramulla", "Budgam", "Doda", "Ganderbal", "Jammu", "Kathua", "Kishtwar", "Kulgam", "Kupwara", "Poonch", "Pulwama", "Rajouri", "Ramban", "Reasi", "Samba", "Shopian", "Srinagar", "Udhampur"],
+  "Ladakh": ["Kargil", "Leh"],
+  "Lakshadweep": ["Lakshadweep"],
+  "Puducherry": ["Karaikal", "Mahe", "Puducherry", "Yanam"],
 };
 
 // India Post's public pincode API — used to auto-fill City/District/State
@@ -357,8 +366,25 @@ const emptyParty = (role) => ({
   references: [],
 });
 
-const FieldInput = ({ fieldKey, value, onChange }) => {
+const FieldInput = ({ fieldKey, value, onChange, siblingValues }) => {
   const cfg = FIELD_TYPES[fieldKey];
+  // Farm Details' "district" is state-dependent too, same as party
+  // addresses (see FieldGrid) — locked to STATE_DISTRICTS[state].
+  if (fieldKey === "district") {
+    const districtOptions = STATE_DISTRICTS[siblingValues?.state] || [];
+    return (
+      <select
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={districtOptions.length === 0}
+        className={inputClass}
+        style={baseInputStyle}
+      >
+        <option value="">{districtOptions.length ? "Select district" : "Select state first"}</option>
+        {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+      </select>
+    );
+  }
   if (cfg.type === "select") {
     return (
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} style={baseInputStyle}>
@@ -381,7 +407,7 @@ const SectionFieldGrid = ({ title, fields, values, onChange }) => (
       {fields.map((k) => (
         <div key={k} className={fieldWrapClass(k)}>
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{FIELD_TYPES[k].label}</label>
-          <FieldInput fieldKey={k} value={values[k]} onChange={(v) => onChange(k, v)} />
+          <FieldInput fieldKey={k} value={values[k]} onChange={(v) => onChange(k, v)} siblingValues={values} />
         </div>
       ))}
     </div>
@@ -391,11 +417,8 @@ const SectionFieldGrid = ({ title, fields, values, onChange }) => (
 // Generic input for a small field descriptor ({key,label,type,options}) —
 // used everywhere inside PartyCard (Personal/Address/Employment/row tables),
 // as opposed to FieldInput above which looks up loan-type-specific fields by
-// key in the module-level FIELD_TYPES dict. `suggestions`/`datalistId`
-// (District only, see FieldGrid) render an <input list> + <datalist> —
-// autocomplete, not a locked <select>, so a district the list doesn't have
-// can still just be typed.
-const SimpleInput = ({ field, value, onChange, suggestions, datalistId }) => {
+// key in the module-level FIELD_TYPES dict.
+const SimpleInput = ({ field, value, onChange }) => {
   if (field.type === "select") {
     return (
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} style={baseInputStyle}>
@@ -406,41 +429,52 @@ const SimpleInput = ({ field, value, onChange, suggestions, datalistId }) => {
   }
   const inputType = field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text";
   return (
-    <>
-      <input
-        type={inputType}
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={field.placeholder}
-        maxLength={field.maxLength}
-        list={suggestions ? datalistId : undefined}
-        className={inputClass}
-        style={baseInputStyle}
-      />
-      {suggestions && (
-        <datalist id={datalistId}>
-          {suggestions.map((o) => <option key={o} value={o} />)}
-        </datalist>
-      )}
-    </>
+    <input
+      type={inputType}
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={field.placeholder}
+      maxLength={field.maxLength}
+      className={inputClass}
+      style={baseInputStyle}
+    />
   );
 };
 
-// `blockId` must be unique per FieldGrid instance on the page (e.g.
-// "0-present", "1-permanent") so each address block's District datalist
-// gets its own DOM id — otherwise two parties' datalists would collide.
-const FieldGrid = ({ fields, values, onChange, blockId }) => (
+// District is a real dropdown too, not free text — locked to whichever
+// State is currently selected (STATE_DISTRICTS), disabled with a "Select
+// state first" placeholder until one is. Handled here rather than via a
+// static `field.options` list since its options depend on a sibling
+// field's live value.
+const FieldGrid = ({ fields, values, onChange }) => (
   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
     {fields.map((f) => {
-      const isDistrict = f.key === "district";
-      const suggestions = isDistrict ? STATE_DISTRICTS[values?.state] : undefined;
-      const datalistId = isDistrict && blockId ? `district-options-${blockId}` : undefined;
+      if (f.key === "district") {
+        const districtOptions = STATE_DISTRICTS[values?.state] || [];
+        return (
+          <div key={f.key}>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
+              {f.label}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
+            </label>
+            <select
+              value={values?.district || ""}
+              onChange={(e) => onChange("district", e.target.value)}
+              disabled={districtOptions.length === 0}
+              className={inputClass}
+              style={baseInputStyle}
+            >
+              <option value="">{districtOptions.length ? "Select district" : "Select state first"}</option>
+              {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+        );
+      }
       return (
         <div key={f.key}>
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
             {f.label}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
           </label>
-          <SimpleInput field={f} value={values?.[f.key]} onChange={(v) => onChange(f.key, v)} suggestions={suggestions} datalistId={datalistId} />
+          <SimpleInput field={f} value={values?.[f.key]} onChange={(v) => onChange(f.key, v)} />
         </div>
       );
     })}
@@ -477,7 +511,7 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
   );
 };
 
-const PartyCard = ({ party, partyIndex, roleLabel, removable, onRemove, onChange }) => {
+const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
   const updatePersonal = (key, value) => onChange({ ...party, personal: { ...party.personal, [key]: value } });
   const updateEmployment = (key, value) => onChange({ ...party, employment: { ...party.employment, [key]: value } });
 
@@ -547,7 +581,7 @@ const PartyCard = ({ party, partyIndex, roleLabel, removable, onRemove, onChange
         <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
           <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: theme.navy }}>Address</h4>
           <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Present Address</p>
-          <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} blockId={`${partyIndex}-present`} />
+          <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} />
 
           <label className="flex items-center gap-2 mt-3 text-xs font-semibold" style={{ color: theme.ink }}>
             <input type="checkbox" checked={party.address.permanent_same_as_present} onChange={(e) => togglePermanentSame(e.target.checked)} />
@@ -556,7 +590,7 @@ const PartyCard = ({ party, partyIndex, roleLabel, removable, onRemove, onChange
           {!party.address.permanent_same_as_present && (
             <div className="mt-2">
               <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Permanent Address</p>
-              <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.permanent} onChange={updatePermanent} blockId={`${partyIndex}-permanent`} />
+              <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.permanent} onChange={updatePermanent} />
             </div>
           )}
 
@@ -567,7 +601,7 @@ const PartyCard = ({ party, partyIndex, roleLabel, removable, onRemove, onChange
           {party.address.office && (
             <div className="mt-2">
               <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Office / Business Address</p>
-              <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.office} onChange={updateOffice} blockId={`${partyIndex}-office`} />
+              <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.office} onChange={updateOffice} />
             </div>
           )}
         </div>
@@ -1097,7 +1131,6 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           {partyRows.map(({ party, idx, label }) => (
             <PartyCard
               key={idx}
-              partyIndex={idx}
               party={party}
               roleLabel={label}
               removable={party.role !== "applicant"}

@@ -356,6 +356,7 @@ const PartnerUserCreateOrder = () => {
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [esignError, setEsignError] = useState("");
+  const [documentUploadError, setDocumentUploadError] = useState("");
   // Per-field validation errors for the eSign form, shown directly above
   // each field instead of the general top-of-form `error` banner — see
   // validateEsignFields/submitOrder. Shape: { document?, signers: [{ name?,
@@ -1450,6 +1451,11 @@ const PartnerUserCreateOrder = () => {
               Order was created, but sending it for eSign failed: {esignError}
             </p>
           )}
+          {documentUploadError && (
+            <p className="text-sm font-medium mb-5 px-4 py-3 rounded" style={{ background: theme.dangerSoft, color: theme.danger, border: `1px solid ${theme.danger}33` }}>
+              Order was created, but uploading the checklist documents failed: {documentUploadError}
+            </p>
+          )}
           {stampError && (
             <p className="text-sm font-medium mb-5 px-4 py-3 rounded" style={{ background: theme.dangerSoft, color: theme.danger, border: `1px solid ${theme.danger}33` }}>
               Order was created, but the eStamp request failed: {stampError}
@@ -1847,6 +1853,7 @@ const PartnerUserCreateOrder = () => {
               setSaving(true);
               setError("");
               setEsignError("");
+              setDocumentUploadError("");
               try {
                 const fd = new FormData();
                 fd.append("service_name", form.service_name);
@@ -1860,6 +1867,23 @@ const PartnerUserCreateOrder = () => {
 
                 const order = await apiUpload("/api/partner-user/orders", fd);
                 window.dispatchEvent(new Event("wallet:updated"));
+
+                // Documents Checklist uploads (PAN card scan, Aadhaar
+                // photo, etc.) — a follow-up call once order.id exists,
+                // same two-call pattern eSign uses below. Non-fatal: the
+                // order itself already succeeded either way.
+                if (loanData.checklistFileEntries?.length) {
+                  try {
+                    const docFd = new FormData();
+                    for (const [key, file] of loanData.checklistFileEntries) {
+                      docFd.append("document_keys", key);
+                      docFd.append("files", file);
+                    }
+                    await apiUpload(`/api/partner-user/orders/${order.id}/loan-documents`, docFd);
+                  } catch (docErr) {
+                    setDocumentUploadError(docErr.message);
+                  }
+                }
 
                 if (loanData.requireEsign) {
                   try {

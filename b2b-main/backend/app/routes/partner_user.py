@@ -2,7 +2,7 @@ import io
 import json
 from datetime import date
 from typing import Any, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, Field, ValidationError, field_validato
 
 from app.auth import get_current_partner_user
 from app.database import get_connection, get_transaction
+from app.validators import detect_ekyc_upload_kind, safe_stored_filename_for_kind
 from app.digilocker_service import fetch_aadhaar_details, get_digilocker_status, initiate_digilocker
 from app.ekyc_service import get_ekyc_status, initiate_ekyc
 from app.pan_service import get_pan_status, initiate_pan_verification
@@ -1169,6 +1170,97 @@ def get_loan_document_checklist(
     from app.loan_i18n import get_default_document_checklist
 
     return get_default_document_checklist(document_name)
+
+
+@router.post("/orders/{order_id}/loan-documents")
+async def upload_loan_documents(
+    order_id: UUID,
+    document_keys: list[str] = Form(...),
+    files: list[UploadFile] = File(...),
+    current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
+) -> list[dict[str, Any]]:
+    """Uploads supporting documents (PAN card scan, Aadhaar photo, income
+    proof, etc.) for the Documents Checklist step — a follow-up call after
+    order creation, same two-call pattern eSign already uses (create order
+    -> get order.id -> attach documents). document_keys[i] identifies
+    files[i] (one of the checklist item `key`s from
+    GET /loans/documents?document_name=... — e.g. "pan_card"); a checklist
+    item can be uploaded more than once, each call just adds another row.
+    Accepts PDF/JPEG/PNG, same validation eKYC uploads already use
+    (detect_ekyc_upload_kind) since checklist documents are just as often a
+    phone photo of an ID card as a scanned PDF."""
+    if len(document_keys) != len(files):
+        raise HTTPException(status_code=400, detail="document_keys and files must be the same length")
+
+    with get_transaction() as connection:
+        order = connection.execute(
+            "SELECT id FROM orders WHERE id = %s AND organization_id = %s AND organization_user_id = %s",
+            (order_id, current_partner_user["organization_id"], current_partner_user["organization_user_id"]),
+        ).fetchone()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        application = connection.execute(
+            "SELECT id FROM loan_applications WHERE order_id = %s", (order_id,)
+        ).fetchone()
+        if not application:
+            raise HTTPException(status_code=400, detail="This order has no loan application to attach documents to")
+
+        upload_dir = _order_upload_dir()
+        saved: list[dict[str, Any]] = []
+        for key, upload in zip(document_keys, files):
+            raw_bytes = await upload.read()
+            try:
+                kind = detect_ekyc_upload_kind(raw_bytes)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"{upload.filename}: {e}") from e
+
+            display_filename = safe_stored_filename_for_kind(upload.filename, kind)
+            stored_ext = {"pdf": ".pdf", "jpeg": ".jpg", "png": ".png"}[kind]
+            stored_name = f"{uuid4()}{stored_ext}"
+            with open(upload_dir / stored_name, "wb") as f:
+                f.write(raw_bytes)
+
+            row = connection.execute(
+                """
+                INSERT INTO loan_application_documents (loan_application_id, document_key, file_name, file_path)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id, document_key, file_name, uploaded_at
+                """,
+                (application["id"], key, display_filename, stored_name),
+            ).fetchone()
+            saved.append(row)
+
+    return saved
+
+
+@router.get("/orders/{order_id}/loan-documents")
+def list_loan_documents(
+    order_id: UUID,
+    current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
+) -> list[dict[str, Any]]:
+    """What's already been uploaded for this order's Documents Checklist —
+    lets the frontend show upload status after a page reload instead of
+    only tracking it in transient React state."""
+    with get_connection() as connection:
+        order = connection.execute(
+            "SELECT id FROM orders WHERE id = %s AND organization_id = %s AND organization_user_id = %s",
+            (order_id, current_partner_user["organization_id"], current_partner_user["organization_user_id"]),
+        ).fetchone()
+        if not order:
+            raise HTTPException(status_code=404, detail="Order not found")
+
+        return connection.execute(
+            """
+            SELECT d.id, d.document_key, d.file_name, d.uploaded_at
+            FROM loan_application_documents d
+            JOIN loan_applications a ON a.id = d.loan_application_id
+            WHERE a.order_id = %s
+            ORDER BY d.uploaded_at ASC
+            """,
+            (order_id,),
+        ).fetchall()
+
 
 @router.post("/orders", status_code=201)
 async def create_my_order(

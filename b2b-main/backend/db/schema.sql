@@ -2489,3 +2489,22 @@ CREATE TABLE IF NOT EXISTS loan_application_party_references (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_loan_application_party_references_party_id ON loan_application_party_references(party_id);
+
+-- Uploaded supporting documents for the Documents Checklist step (see
+-- loan_i18n.py's DOCUMENT_CHECKLISTS for the document_key/document_name
+-- vocabulary — e.g. "pan_card"/"PAN Card") — a follow-up upload after order
+-- creation (app/routes/partner_user.py's upload_loan_documents), same
+-- two-call pattern eSign already uses. One row per uploaded file; a
+-- checklist item can be re-uploaded (old rows are simply left in place,
+-- there's no versioning need here). Actual bytes are written to disk under
+-- the same uploads/orders directory every other order document uses
+-- (_order_upload_dir) — file_path is the stored (UUID) filename there.
+CREATE TABLE IF NOT EXISTS loan_application_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    loan_application_id UUID NOT NULL REFERENCES loan_applications(id) ON DELETE CASCADE,
+    document_key VARCHAR(100) NOT NULL,
+    file_name VARCHAR(255),
+    file_path VARCHAR(255) NOT NULL,
+    uploaded_at TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_loan_application_documents_application_id ON loan_application_documents(loan_application_id);

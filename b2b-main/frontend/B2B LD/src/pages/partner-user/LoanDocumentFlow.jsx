@@ -5,6 +5,7 @@ import { isValidMobile, isValidEmail } from "../../lib/validation";
 import { renderableEkycFields } from "../../lib/ekycFields";
 import {
   User, UserPlus, ShieldCheck, IdCard, MapPin, Briefcase, Wallet, CreditCard, Landmark, Gem, Contact, Plus,
+  Upload, FileCheck2, X,
 } from "lucide-react";
 
 const inputClass = "w-full px-4 py-2.5 text-sm rounded outline-none transition-all disabled:cursor-not-allowed";
@@ -823,6 +824,24 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const [checklistItems, setChecklistItems] = useState([]);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [confirmedDocKeys, setConfirmedDocKeys] = useState(new Set());
+  // Actual attached files per checklist item (key -> File), uploaded via
+  // POST /orders/{id}/loan-documents as a follow-up call once the order
+  // exists — see handleFinalize/PartnerUserCreateOrder.jsx's
+  // onSubmitOrder, same two-call pattern eSign already uses. Purely
+  // optional: a checklist item can be confirmed without a file (e.g. "I
+  // have the physical copy") or a file can be attached without checking
+  // the confirm box — attaching one auto-checks it.
+  const [checklistFiles, setChecklistFiles] = useState({});
+  const setChecklistFile = (key, file) => {
+    if (!file) return;
+    setChecklistFiles((prev) => ({ ...prev, [key]: file }));
+    setConfirmedDocKeys((prev) => new Set(prev).add(key));
+  };
+  const removeChecklistFile = (key) => setChecklistFiles((prev) => {
+    const next = { ...prev };
+    delete next[key];
+    return next;
+  });
 
   useEffect(() => {
     const docName = document?.doc_name;
@@ -1153,7 +1172,12 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
       document_name: item.document_name,
       mandatory: !!item.is_mandatory,
       confirmed: confirmedDocKeys.has(item.key),
+      uploaded: !!checklistFiles[item.key],
     }));
+    // Uploaded after the order exists (needs order.id) — see
+    // PartnerUserCreateOrder.jsx's onSubmitOrder, POST
+    // /orders/{id}/loan-documents, same two-call pattern eSign uses.
+    const checklistFileEntries = Object.entries(checklistFiles).filter(([, f]) => f);
 
     onSubmitOrder({
       file,
@@ -1162,6 +1186,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
       customer_mobile: customerMobile,
       customer_email: customerEmail,
       signers,
+      checklistFileEntries,
       loan_details: {
         loan_type: document.doc_name,
         language,
@@ -1370,16 +1395,51 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             <p className="text-xs" style={{ color: theme.slate }}>No documents required.</p>
           ) : (
             <div className="space-y-2">
-              {visibleChecklistItems.map((item) => (
-                <label key={item.key} className="flex items-start gap-2 text-sm">
-                  <input type="checkbox" checked={confirmedDocKeys.has(item.key)} onChange={() => toggleDocConfirmed(item.key)} className="mt-0.5" />
-                  <span>
-                    {item.document_name}
-                    {item.is_mandatory && <span className="text-red-600"> *</span>}
-                    {item.description && <span className="block text-xs" style={{ color: theme.slate }}>{item.description}</span>}
-                  </span>
-                </label>
-              ))}
+              {visibleChecklistItems.map((item) => {
+                const file = checklistFiles[item.key];
+                return (
+                  <div key={item.key} className="flex items-start justify-between gap-3 rounded border p-2.5" style={{ borderColor: theme.border }}>
+                    <label className="flex items-start gap-2 text-sm flex-1 min-w-0">
+                      <input type="checkbox" checked={confirmedDocKeys.has(item.key)} onChange={() => toggleDocConfirmed(item.key)} className="mt-0.5 shrink-0" />
+                      <span className="min-w-0">
+                        {item.document_name}
+                        {item.is_mandatory && <span className="text-red-600"> *</span>}
+                        {item.description && <span className="block text-xs" style={{ color: theme.slate }}>{item.description}</span>}
+                        {file && (
+                          <span className="flex items-center gap-1 text-xs mt-1" style={{ color: theme.success }}>
+                            <FileCheck2 size={13} /> <span className="truncate max-w-[200px]">{file.name}</span>
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                    <div className="shrink-0">
+                      {file ? (
+                        <button
+                          type="button"
+                          onClick={() => removeChecklistFile(item.key)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold text-red-600"
+                          style={{ borderColor: theme.border }}
+                        >
+                          <X size={13} /> Remove
+                        </button>
+                      ) : (
+                        <label
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-semibold cursor-pointer whitespace-nowrap"
+                          style={{ borderColor: theme.border, color: theme.navy }}
+                        >
+                          <Upload size={13} /> Upload
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,application/pdf"
+                            className="hidden"
+                            onChange={(e) => { setChecklistFile(item.key, e.target.files?.[0]); e.target.value = ""; }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

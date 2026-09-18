@@ -403,7 +403,23 @@ const emptyBankRow = () => ({ bank_name: "", bank_branch: "", account_type: "", 
 const emptyAssetRow = () => ({ asset_type: "", asset_description: "", asset_value: "" });
 const emptyReferenceRow = () => ({ reference_name: "", reference_address: "", reference_phone: "" });
 
+// Stable per-party identity, independent of role/position — the computed
+// display label ("Co-Applicant 2") is NOT stable enough to key state on:
+// removing an earlier same-role party (e.g. Co-Applicant 1) relabels every
+// later same-role party, which would silently orphan anything keyed by the
+// old label (see checklistItemKey below). Underscore-prefixed as a signal
+// this is frontend-only bookkeeping — stripped before anything is sent to
+// the backend (see stripUiKey).
+let _partyKeySeq = 0;
+const nextPartyKey = () => `p${Date.now()}_${++_partyKeySeq}`;
+const stripUiKey = (party) => {
+  const rest = { ...party };
+  delete rest._uiKey;
+  return rest;
+};
+
 const emptyParty = (role) => ({
+  _uiKey: nextPartyKey(),
   role,
   personal: emptyPersonal(),
   address: { present: emptyAddressBlock(), permanent_same_as_present: true, permanent: null, office: null },
@@ -863,17 +879,19 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   // includes "guarantor" needs its own upload slot for EACH guarantor if
   // there's more than one (same for Co-Applicants, and even the common
   // items like PAN Card: the Applicant's PAN and a Co-Applicant's PAN are
-  // two different files). Keyed by `${label}:${item.key}` (label already
-  // disambiguates "Co-Applicant 1" from "Co-Applicant 2") rather than
-  // party array index, so removing an earlier, different-role party
-  // doesn't orphan a later party's already-uploaded files.
+  // two different files). Keyed by party._uiKey (stable — see emptyParty),
+  // NOT the computed display label: removing an earlier same-role party
+  // relabels every later same-role party ("Co-Applicant 2" -> "Co-Applicant
+  // 1"), which would silently orphan that party's already-uploaded files
+  // if the label itself were the key.
   const partyChecklistGroups = partyRows
     .map(({ party, label }) => ({
+      uiKey: party._uiKey,
       label,
       items: checklistItems.filter((item) => !item.applicant_type?.length || item.applicant_type.includes(party.role)),
     }))
     .filter((g) => g.items.length > 0);
-  const checklistItemKey = (partyLabel, itemKey) => `${partyLabel}:${itemKey}`;
+  const checklistItemKey = (partyUiKey, itemKey) => `${partyUiKey}:${itemKey}`;
   const toggleDocConfirmed = (key) => setConfirmedDocKeys((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -1195,7 +1213,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           interest_rate: formData.interestRate || "12",
           repayment_frequency: formData.repaymentFrequency || "Monthly",
           dynamic_fields: dynFields,
-          parties,
+          parties: parties.map(stripUiKey),
         })
       });
 
@@ -1234,9 +1252,9 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
     // Every mandatory checklist item must be confirmed (checkbox) or have a
     // file attached before the order can be finalized — the red "*" next
     // to a mandatory item was previously decorative only.
-    const missingMandatoryDocs = partyChecklistGroups.flatMap(({ label, items }) =>
+    const missingMandatoryDocs = partyChecklistGroups.flatMap(({ uiKey, label, items }) =>
       items
-        .filter((item) => item.is_mandatory && !confirmedDocKeys.has(checklistItemKey(label, item.key)))
+        .filter((item) => item.is_mandatory && !confirmedDocKeys.has(checklistItemKey(uiKey, item.key)))
         .map((item) => `${label}: ${item.document_name}`)
     );
     if (missingMandatoryDocs.length > 0) {
@@ -1262,9 +1280,9 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
       position: SIGNER_POSITIONS[i] || undefined,
     }));
 
-    const documentsChecklist = partyChecklistGroups.flatMap(({ label, items }) =>
+    const documentsChecklist = partyChecklistGroups.flatMap(({ uiKey, label, items }) =>
       items.map((item) => {
-        const compositeKey = checklistItemKey(label, item.key);
+        const compositeKey = checklistItemKey(uiKey, item.key);
         return {
           party: label,
           document_name: item.document_name,
@@ -1307,7 +1325,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           interest_rate: formData.interestRate || "12",
           repayment_frequency: formData.repaymentFrequency || "Monthly",
           loan_type_fields: generatedDynamicFields,
-          parties: generatedParties,
+          parties: generatedParties.map(stripUiKey),
           documents_checklist: documentsChecklist,
           ...(useEkyc ? { ekyc_order_id: ekycOrderId, ekyc_doc_type: ekycDocType } : {}),
         },
@@ -1532,12 +1550,12 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             <p className="text-xs" style={{ color: theme.slate }}>No documents required.</p>
           ) : (
             <div className="space-y-4">
-              {partyChecklistGroups.map(({ label, items }) => (
-                <div key={label}>
+              {partyChecklistGroups.map(({ uiKey, label, items }) => (
+                <div key={uiKey}>
                   <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>{label}</p>
                   <div className="space-y-2">
                     {items.map((item) => {
-                      const compositeKey = checklistItemKey(label, item.key);
+                      const compositeKey = checklistItemKey(uiKey, item.key);
                       const file = checklistFiles[compositeKey];
                       return (
                         <div key={compositeKey} className="flex items-start justify-between gap-3 rounded border p-2.5" style={{ borderColor: theme.border }}>

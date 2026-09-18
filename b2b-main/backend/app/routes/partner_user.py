@@ -820,10 +820,43 @@ def generate_loan_draft(
     sub_label_style = ParagraphStyle(
         'SubLabelStyle', parent=styles['Normal'], fontName=font_bold, fontSize=10.5, spaceBefore=4, spaceAfter=4,
     )
-    party_style = ParagraphStyle(
-        'PartyStyle', parent=styles['Heading1'], fontName=font_bold, fontSize=14, spaceBefore=20, spaceAfter=6,
-        textColor=colors.HexColor('#1E6091'),
+    # Real bank application forms (SBI/IDFC/Kotak) mark every section with a
+    # solid colored bar — "FORM-A (PERSONAL DETAILS)", "FORM-B (EMPLOYMENT &
+    # INCOME DETAILS)", etc. This isn't a pixel copy of any one bank's form,
+    # but the same visual device, in this platform's own brand navy (matches
+    # theme.navy in the frontend's userPortalTheme.js) rather than a
+    # specific bank's blue.
+    BRAND_NAVY = colors.HexColor('#1E6091')
+    ribbon_style = ParagraphStyle(
+        'RibbonStyle', parent=styles['Normal'], fontName=font_bold, fontSize=11, textColor=colors.white, leading=14,
     )
+    role_marks_style = ParagraphStyle(
+        'RoleMarksStyle', parent=styles['Normal'], fontName=font_regular, fontSize=9.5, textColor=colors.white,
+        leading=13,
+    )
+
+    def ribbon(text, sub_text=None):
+        """A full-width colored section bar, optionally with a second line
+        (used for the Applicant/Co-Applicant/Guarantor role-selector line,
+        mirroring the "[tick one]" ribbon on the forms this is modeled on).
+        `text`/`sub_text` are already-translated strings in the document's
+        own font — never user input, so no latin() wrap needed here."""
+        cells = [[Paragraph(text, ribbon_style)]]
+        style_commands = [
+            ('BACKGROUND', (0, 0), (-1, -1), BRAND_NAVY),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]
+        if sub_text:
+            cells.append([Paragraph(sub_text, role_marks_style)])
+            # Row 1 only exists in this branch — referencing it when there's
+            # just one row would index past the table.
+            style_commands.append(('TOPPADDING', (0, 1), (-1, 1), 0))
+        table = Table(cells, colWidths=[500])
+        table.setStyle(TableStyle(style_commands))
+        return table
 
     def kv_table(pairs):
         """pairs: list of (translated_label, already-markup-safe value
@@ -877,7 +910,8 @@ def generate_loan_draft(
         table = Table(data, colWidths=[col_width] * len(col_keys))
         table.setStyle(TableStyle([
             ('FONTNAME', (0, 0), (-1, 0), font_bold),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.whitesmoke),
+            ('BACKGROUND', (0, 0), (-1, 0), BRAND_NAVY),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
             ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
@@ -911,9 +945,22 @@ def generate_loan_draft(
 
     story = []
 
-    # Title — document_name (e.g. "Car Loan") is always the English name
-    # from the shared `document` catalog table, never translated.
-    story.append(Paragraph(f"{latin(req.document_name.upper(), bold=True)} {t['title_suffix']}", title_style))
+    # Title — boxed and centered, echoing the bordered title block on the
+    # bank forms this is modeled on (e.g. "CAR LOAN / APPLICATION FORM" in a
+    # box at the top of the SBI form). document_name (e.g. "Car Loan") is
+    # always the English name from the shared `document` catalog table,
+    # never translated.
+    title_table = Table(
+        [[Paragraph(f"{latin(req.document_name.upper(), bold=True)} {t['title_suffix']}", title_style)]],
+        colWidths=[500],
+    )
+    title_table.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 1.2, BRAND_NAVY),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+    ]))
+    story.append(title_table)
+    story.append(Spacer(1, 16))
 
     # Loan Details — the letterhead-style summary block.
     ldf = t["loan_details_fields"]
@@ -929,7 +976,7 @@ def generate_loan_draft(
         (ldf["loan_purpose"], latin(req.document_name)),
     ])
     if loan_details_table:
-        story.append(Paragraph(t["section_headings"]["loan_details"], heading_style))
+        story.append(ribbon(t["section_headings"]["loan_details"]))
         story.append(loan_details_table)
         story.append(Spacer(1, 12))
 
@@ -967,11 +1014,21 @@ def generate_loan_draft(
             (t["signature_captions"][party.role] + role_suffix, latin(party.personal.full_name))
         )
 
-        story.append(Paragraph(t["party_roles"][party.role] + role_suffix, party_style))
+        # Role-selector line under the ribbon — "[X] Applicant  [ ] Co-Applicant
+        # [ ] Guarantor" — mirrors the tick-one-box ribbon at the top of
+        # Form-A/Form-B on the bank forms this is modeled on. Plain ASCII
+        # brackets rather than Unicode checkbox glyphs (☐/☑), since the base14
+        # Helvetica font and the vendored Noto subsets aren't guaranteed to
+        # include those glyphs.
+        role_marks = "     ".join(
+            f"[{'X' if r == party.role else ' '}] {t['party_roles'][r]}" for r in role_order
+        )
+        story.append(Spacer(1, 14))
+        story.append(ribbon(t["party_roles"][party.role] + role_suffix, sub_text=role_marks))
 
         personal_table = kv_table(dyn_rows(party.personal.model_dump(), PERSONAL_KEYS))
         if personal_table:
-            story.append(Paragraph(t["section_headings"]["personal_kyc"], heading_style))
+            story.append(ribbon(t["section_headings"]["personal_kyc"]))
             story.append(personal_table)
             story.append(Spacer(1, 10))
 
@@ -983,7 +1040,7 @@ def generate_loan_draft(
         if party.address.office:
             office_table = kv_table(dyn_rows(party.address.office.model_dump(), ADDRESS_KEYS))
         if present_table or permanent_table or office_table:
-            story.append(Paragraph(t["section_headings"]["address"], heading_style))
+            story.append(ribbon(t["section_headings"]["address"]))
             if present_table:
                 story.append(Paragraph(t["present_address"], sub_label_style))
                 story.append(present_table)
@@ -999,7 +1056,7 @@ def generate_loan_draft(
 
         employment_table = kv_table(dyn_rows(party.employment.model_dump(), EMPLOYMENT_KEYS))
         if employment_table:
-            story.append(Paragraph(t["section_headings"]["party_employment"], heading_style))
+            story.append(ribbon(t["section_headings"]["party_employment"]))
             story.append(employment_table)
             story.append(Spacer(1, 10))
 
@@ -1015,7 +1072,7 @@ def generate_loan_draft(
         ]:
             table = rows_table(col_keys, rows)
             if table:
-                story.append(Paragraph(t["section_headings"][section_key], heading_style))
+                story.append(ribbon(t["section_headings"][section_key]))
                 story.append(table)
                 story.append(Spacer(1, 10))
 
@@ -1025,7 +1082,7 @@ def generate_loan_draft(
     for section_key, field_keys in type_config["sections"]:
         section_table = kv_table(dyn_rows(req.dynamic_fields, field_keys))
         if section_table:
-            story.append(Paragraph(t["section_headings"][section_key], heading_style))
+            story.append(ribbon(t["section_headings"][section_key]))
             story.append(section_table)
             story.append(Spacer(1, 12))
 
@@ -1039,7 +1096,7 @@ def generate_loan_draft(
     repayment_rows += dyn_rows(req.dynamic_fields, type_config["repayment_security"])
     repayment_table = kv_table(repayment_rows)
     if repayment_table:
-        story.append(Paragraph(t["section_headings"]["repayment_security"], heading_style))
+        story.append(ribbon(t["section_headings"]["repayment_security"]))
         story.append(repayment_table)
         story.append(Spacer(1, 12))
 

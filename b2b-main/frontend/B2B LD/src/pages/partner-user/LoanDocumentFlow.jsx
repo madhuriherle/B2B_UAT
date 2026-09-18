@@ -147,10 +147,15 @@ const getLoanTypeConfig = (docName) => {
 // models and app/loan_i18n.py's matching FIELD_LABELS keys.
 // =========================================================================
 
+// `required: true` marks the fields that must be filled before a draft can
+// be generated (see validatePartiesRequiredFields) — mirrors which fields
+// SBI/IDFC/Kotak's own forms treat as compulsory (Name/DOB/PAN/Aadhaar,
+// core present-address lines, and Occupation Type), not every field on the
+// form.
 const PARTY_PERSONAL_FIELDS = [
-  { key: "full_name", label: "Full Name", type: "text" },
-  { key: "gender", label: "Gender", type: "select", options: ["Male", "Female", "Third Gender"] },
-  { key: "date_of_birth", label: "Date of Birth", type: "date" },
+  { key: "full_name", label: "Full Name", type: "text", required: true },
+  { key: "gender", label: "Gender", type: "select", options: ["Male", "Female", "Third Gender"], required: true },
+  { key: "date_of_birth", label: "Date of Birth", type: "date", required: true },
   { key: "marital_status", label: "Marital Status", type: "select", options: ["Single", "Married", "Divorced", "Widowed"] },
   { key: "spouse_name", label: "Spouse Name", type: "text" },
   { key: "father_name", label: "Father's Name", type: "text" },
@@ -161,14 +166,16 @@ const PARTY_PERSONAL_FIELDS = [
   { key: "residential_status", label: "Residential Status", type: "select", options: ["Resident Indian", "NRI", "PIO", "Foreign Citizen"] },
   { key: "no_of_dependents", label: "No. of Dependents", type: "number" },
   { key: "occupation", label: "Occupation", type: "text" },
-  { key: "pan_number", label: "PAN Number", type: "text" },
-  { key: "aadhaar_number", label: "Aadhaar Number", type: "text" },
+  { key: "pan_number", label: "PAN Number", type: "text", required: true },
+  { key: "aadhaar_number", label: "Aadhaar Number", type: "text", required: true },
   { key: "voter_id", label: "Voter ID Number", type: "text" },
   { key: "driving_license", label: "Driving Licence Number", type: "text" },
   { key: "passport_number", label: "Passport Number", type: "text" },
   { key: "passport_valid_upto", label: "Passport Valid Upto", type: "date" },
 ];
 
+// Plain address field set — reused as-is for Permanent/Office (optional
+// blocks the partner user opts into, so nothing in them is mandatory).
 const PARTY_ADDRESS_FIELDS = [
   { key: "house_no", label: "House / Flat / Building No.", type: "text" },
   { key: "street", label: "Street / Area / Locality", type: "text" },
@@ -182,8 +189,15 @@ const PARTY_ADDRESS_FIELDS = [
   { key: "email", label: "Email", type: "email" },
 ];
 
+// Present Address is always collected (it's what customer_email/mobile and
+// the eSign invite come from — see handleFinalize), so its core lines are
+// required; every other field mirrors PARTY_ADDRESS_FIELDS above.
+const PARTY_PRESENT_ADDRESS_FIELDS = PARTY_ADDRESS_FIELDS.map((f) =>
+  ["house_no", "city", "state", "pincode", "mobile", "email"].includes(f.key) ? { ...f, required: true } : f
+);
+
 const PARTY_EMPLOYMENT_FIELDS = [
-  { key: "occupation_type", label: "Occupation Type", type: "select", options: ["Salaried", "Self-Employed Professional", "Business", "Agriculturist", "Pensioner", "Other"] },
+  { key: "occupation_type", label: "Occupation Type", type: "select", options: ["Salaried", "Self-Employed Professional", "Business", "Agriculturist", "Pensioner", "Other"], required: true },
   { key: "employer_name", label: "Employer Name", type: "text" },
   { key: "designation", label: "Designation", type: "text" },
   { key: "department", label: "Department", type: "text" },
@@ -318,7 +332,9 @@ const FieldGrid = ({ fields, values, onChange }) => (
   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
     {fields.map((f) => (
       <div key={f.key}>
-        <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{f.label}</label>
+        <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
+          {f.label}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
+        </label>
         <SimpleInput field={f} value={values?.[f.key]} onChange={(v) => onChange(f.key, v)} />
       </div>
     ))}
@@ -388,7 +404,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
         <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
           <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: theme.navy }}>Address</h4>
           <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Present Address</p>
-          <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} />
+          <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} />
 
           <label className="flex items-center gap-2 mt-3 text-xs font-semibold" style={{ color: theme.ink }}>
             <input type="checkbox" checked={party.address.permanent_same_as_present} onChange={(e) => togglePermanentSame(e.target.checked)} />
@@ -684,7 +700,35 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const setField = (key, value) => setFormData((prev) => ({ ...prev, [key]: value }));
   const updateTypeField = (key, value) => setTypeFields((prev) => ({ ...prev, [key]: value }));
 
+  // Every field marked `required: true` above (Name/DOB/PAN/Aadhaar, core
+  // Present Address lines, Occupation Type, per party — plus Loan Amount/
+  // Tenure) must be filled before a draft can be generated, mirroring
+  // real bank forms treating these as compulsory. Returns human-readable
+  // "<Role>: <Field>" descriptions of everything still missing.
+  const getMissingRequiredFields = () => {
+    const missing = [];
+    if (!formData.loanAmount) missing.push("Loan Amount");
+    if (!formData.tenure) missing.push("Tenure (Months)");
+    for (const { party, label } of partyRows) {
+      for (const f of PARTY_PERSONAL_FIELDS) {
+        if (f.required && !party.personal[f.key]) missing.push(`${label}: ${f.label}`);
+      }
+      for (const f of PARTY_PRESENT_ADDRESS_FIELDS) {
+        if (f.required && !party.address.present[f.key]) missing.push(`${label}: Present Address – ${f.label}`);
+      }
+      for (const f of PARTY_EMPLOYMENT_FIELDS) {
+        if (f.required && !party.employment[f.key]) missing.push(`${label}: ${f.label}`);
+      }
+    }
+    return missing;
+  };
+
   const handleGenerateDraft = async () => {
+    const missingFields = getMissingRequiredFields();
+    if (missingFields.length > 0) {
+      alert("Please fill in the following required fields before generating the draft:\n\n" + missingFields.join("\n"));
+      return;
+    }
     setGenerating(true);
     try {
       // Collect every loan-type dynamic field the backend renders (vehicle/
@@ -915,11 +959,11 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Loan Details</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Loan Amount</label>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Loan Amount<span style={{ color: "#dc2626" }}> *</span></label>
               <input type="number" value={formData.loanAmount} onChange={e => setField("loanAmount", e.target.value)} className={inputClass} style={baseInputStyle} />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Tenure (Months)</label>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Tenure (Months)<span style={{ color: "#dc2626" }}> *</span></label>
               <input type="number" value={formData.tenure} onChange={e => setField("tenure", e.target.value)} className={inputClass} style={baseInputStyle} />
             </div>
             <div>

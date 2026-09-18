@@ -344,6 +344,7 @@ def list_my_services(current_partner_user: dict[str, Any] = Depends(get_current_
                 "state_id": d["state_id"],
                 "state_name": d["state_name"],
                 "base_price": d["base_price"],
+                "available_languages": d["available_languages"] or [],
                 "assigned": True,
             }
             for d in list_configured_documents_summary(organization_id)

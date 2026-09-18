@@ -623,6 +623,7 @@ def list_partner_user_services(
                 odc.state_id,
                 s.state_name,
                 odc.base_price,
+                odc.available_languages,
                 (pus.id IS NOT NULL) AS assigned
             FROM organization_document_config odc
             JOIN document d ON d.doc_id = odc.doc_id

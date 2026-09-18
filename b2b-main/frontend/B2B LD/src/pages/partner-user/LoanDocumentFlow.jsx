@@ -101,6 +101,16 @@ function matchFromList(list, raw) {
   return list.find((o) => o.toLowerCase().includes(normalized) || normalized.includes(o.toLowerCase())) || "";
 }
 
+// District is a dropdown locked to whichever State is currently selected
+// (STATE_DISTRICTS), so a District value picked under one State is not a
+// valid option under another. Without this, changing State after picking a
+// District leaves the *display* blank (the stale value matches no <option>)
+// while the underlying value — and whatever gets submitted — silently keeps
+// the old, now-mismatched District (e.g. state: "Kerala", district:
+// "Bengaluru Urban"). Applied on every State change, party address or
+// loan-type (Agriculture's Farm Details).
+const withDistrictReset = (key, value) => ({ [key]: value, ...(key === "state" ? { district: "" } : {}) });
+
 async function lookupPincode(pincode) {
   if (_pincodeCache.has(pincode)) return _pincodeCache.get(pincode);
   let result = null;
@@ -642,15 +652,15 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
   };
 
   const updatePresent = (key, value) => {
-    onChange({ ...party, address: { ...party.address, present: { ...party.address.present, [key]: value } } });
+    onChange({ ...party, address: { ...party.address, present: { ...party.address.present, ...withDistrictReset(key, value) } } });
     if (key === "pincode") autofillFromPincode("present", value);
   };
   const updatePermanent = (key, value) => {
-    onChange({ ...party, address: { ...party.address, permanent: { ...(party.address.permanent || emptyAddressBlock()), [key]: value } } });
+    onChange({ ...party, address: { ...party.address, permanent: { ...(party.address.permanent || emptyAddressBlock()), ...withDistrictReset(key, value) } } });
     if (key === "pincode") autofillFromPincode("permanent", value);
   };
   const updateOffice = (key, value) => {
-    onChange({ ...party, address: { ...party.address, office: { ...(party.address.office || emptyAddressBlock()), [key]: value } } });
+    onChange({ ...party, address: { ...party.address, office: { ...(party.address.office || emptyAddressBlock()), ...withDistrictReset(key, value) } } });
     if (key === "pincode") autofillFromPincode("office", value);
   };
   const togglePermanentSame = (same) => onChange({ ...party, address: { ...party.address, permanent_same_as_present: same, permanent: same ? null : emptyAddressBlock() } });
@@ -1136,7 +1146,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   };
 
   const setField = (key, value) => setFormData((prev) => ({ ...prev, [key]: value }));
-  const updateTypeField = (key, value) => setTypeFields((prev) => ({ ...prev, [key]: value }));
+  const updateTypeField = (key, value) => setTypeFields((prev) => ({ ...prev, ...withDistrictReset(key, value) }));
 
   // Every field marked `required: true` above (Name/DOB/PAN/Aadhaar, core
   // Present Address lines, Occupation Type, per party; the loan-type

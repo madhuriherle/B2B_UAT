@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { theme, serif, inputStyle as baseInputStyle } from "../../lib/userPortalTheme";
 import { apiUrl, apiRequest, apiUpload, getStoredToken } from "../../lib/api";
 import { isValidMobile, isValidEmail } from "../../lib/validation";
 import { renderableEkycFields } from "../../lib/ekycFields";
+import {
+  User, UserPlus, ShieldCheck, IdCard, MapPin, Briefcase, Wallet, CreditCard, Landmark, Gem, Contact, Plus,
+} from "lucide-react";
 
 const inputClass = "w-full px-4 py-2.5 text-sm rounded outline-none transition-all disabled:cursor-not-allowed";
 
@@ -117,9 +120,37 @@ async function lookupPincode(pincode) {
 }
 
 const ROLE_LABELS = { applicant: "Applicant", co_applicant: "Co-Applicant", guarantor: "Guarantor" };
+const ROLE_ICONS = { applicant: User, co_applicant: UserPlus, guarantor: ShieldCheck };
+// theme.gold is actually the same navy hex as theme.navy in this theme
+// (not a real gold) — a muted amber literal gives Guarantor its own
+// identity instead of looking identical to Applicant.
+const ROLE_COLORS = { applicant: theme.navy, co_applicant: theme.success, guarantor: "#A16207" };
 const MAX_CO_APPLICANTS = 3;
 const MAX_GUARANTORS = 2;
 const SIGNER_POSITIONS = ["bottom-right", "bottom-left", "top-right", "top-left"];
+
+// Icon per PartyCard/RepeatingRowsSection heading — purely decorative, same
+// data either way.
+const SECTION_ICONS = {
+  "Personal / KYC": IdCard,
+  "Address": MapPin,
+  "Employment / Business": Briefcase,
+  "Income Sources": Wallet,
+  "Existing Loans": CreditCard,
+  "Bank Accounts": Landmark,
+  "Assets": Gem,
+  "References": Contact,
+};
+
+const SectionHeading = ({ title }) => {
+  const Icon = SECTION_ICONS[title];
+  return (
+    <h4 className="text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: theme.navy }}>
+      {Icon && <Icon size={14} strokeWidth={2.25} />}
+      {title}
+    </h4>
+  );
+};
 
 // Every loan-TYPE-specific field the backend can render (vehicle/property/
 // farm details — these describe the loan itself, not a party), keyed by its
@@ -510,22 +541,54 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
 
   return (
     <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
-      <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: theme.navy }}>{title}</h4>
-      {rows.length === 0 && <p className="text-xs mb-2" style={{ color: theme.slate }}>None added.</p>}
-      {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3 mb-2 items-end">
-          {fields.map((f) => (
-            <div key={f.key}>
-              <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: theme.slate }}>{f.label}</label>
-              <SimpleInput field={f} value={row[f.key]} onChange={(v) => updateRow(i, f.key, v)} />
+      <SectionHeading title={title} />
+      {rows.length === 0 ? (
+        <button
+          type="button"
+          onClick={addRow}
+          className="w-full flex items-center justify-center gap-1.5 py-3 rounded border-2 border-dashed text-xs font-semibold transition-colors hover:bg-slate-50"
+          style={{ borderColor: theme.border, color: theme.slate }}
+        >
+          <Plus size={14} /> Add {title.toLowerCase()}
+        </button>
+      ) : (
+        <>
+          {rows.map((row, i) => (
+            <div key={i} className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3 mb-2 items-end">
+              {fields.map((f) => (
+                <div key={f.key}>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: theme.slate }}>{f.label}</label>
+                  <SimpleInput field={f} value={row[f.key]} onChange={(v) => updateRow(i, f.key, v)} />
+                </div>
+              ))}
+              <button type="button" onClick={() => removeRow(i)} className="text-xs font-semibold text-red-600 justify-self-start pb-2.5">Remove</button>
             </div>
           ))}
-          <button type="button" onClick={() => removeRow(i)} className="text-xs font-semibold text-red-600 justify-self-start pb-2.5">Remove</button>
-        </div>
-      ))}
-      <button type="button" onClick={addRow} className="text-xs font-semibold" style={{ color: theme.navy }}>+ Add row</button>
+          <button type="button" onClick={addRow} className="text-xs font-semibold inline-flex items-center gap-1" style={{ color: theme.navy }}>
+            <Plus size={12} /> Add row
+          </button>
+        </>
+      )}
     </div>
   );
+};
+
+// Rough "how much of this party is filled in" indicator — counts non-blank
+// values across Personal/KYC, Present Address, and Employment fields.
+// Decorative only, doesn't affect validation (see getMissingRequiredFields).
+const countPartyProgress = (party) => {
+  let filled = 0, total = 0;
+  for (const [fields, values] of [
+    [PARTY_PERSONAL_FIELDS, party.personal],
+    [PARTY_PRESENT_ADDRESS_FIELDS, party.address.present],
+    [PARTY_EMPLOYMENT_FIELDS, party.employment],
+  ]) {
+    for (const f of fields) {
+      total += 1;
+      if (values?.[f.key]) filled += 1;
+    }
+  }
+  return { filled, total };
 };
 
 const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
@@ -575,28 +638,40 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
   const toggleOffice = (has) => onChange({ ...party, address: { ...party.address, office: has ? emptyAddressBlock() : null } });
   const setRows = (key, rows) => onChange({ ...party, [key]: rows });
 
+  const RoleIcon = ROLE_ICONS[party.role];
+  const roleColor = ROLE_COLORS[party.role];
+  const { filled, total } = countPartyProgress(party);
+
   return (
-    <details open className="rounded-lg border mb-4 overflow-hidden" style={{ borderColor: theme.border, background: "#fff" }}>
-      <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between" style={{ background: "#F3F8FB" }}>
-        <span className="text-sm font-bold uppercase tracking-wide" style={{ color: theme.navy }}>{roleLabel}</span>
-        {removable && (
-          <button
-            type="button"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
-            className="text-xs font-semibold text-red-600"
-          >
-            Remove
-          </button>
-        )}
+    <details open className="rounded-lg border mb-4 overflow-hidden shadow-sm" style={{ borderColor: theme.border, borderLeft: `4px solid ${roleColor}`, background: "#fff" }}>
+      <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-2" style={{ background: "#F3F8FB" }}>
+        <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide" style={{ color: roleColor }}>
+          <RoleIcon size={16} strokeWidth={2.25} />
+          {roleLabel}
+        </span>
+        <span className="flex items-center gap-3">
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "#fff", color: theme.slate, border: `1px solid ${theme.border}` }}>
+            {filled}/{total} filled
+          </span>
+          {removable && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemove(); }}
+              className="text-xs font-semibold text-red-600"
+            >
+              Remove
+            </button>
+          )}
+        </span>
       </summary>
       <div className="p-4 space-y-4">
         <div>
-          <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: theme.navy }}>Personal / KYC</h4>
+          <SectionHeading title="Personal / KYC" />
           <FieldGrid fields={PARTY_PERSONAL_FIELDS} values={party.personal} onChange={updatePersonal} />
         </div>
 
         <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
-          <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: theme.navy }}>Address</h4>
+          <SectionHeading title="Address" />
           <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Present Address</p>
           <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} />
 
@@ -624,7 +699,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
         </div>
 
         <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
-          <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: theme.navy }}>Employment / Business</h4>
+          <SectionHeading title="Employment / Business" />
           <FieldGrid fields={PARTY_EMPLOYMENT_FIELDS} values={party.employment} onChange={updateEmployment} />
         </div>
 
@@ -669,6 +744,14 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const loanType = getLoanTypeConfig(document?.doc_name);
   const [step, setStep] = useState(1);
   const [language, setLanguage] = useState("English");
+
+  // Jump-nav targets for the mini progress strip at the top of step 1 — a
+  // long form (Agriculture with 3 parties can be 100+ fields) benefits from
+  // letting the user skip straight to a section instead of scrolling.
+  const applicantsSectionRef = useRef(null);
+  const loanDetailsSectionRef = useRef(null);
+  const documentsSectionRef = useRef(null);
+  const scrollToSection = (ref) => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   const [useEkyc, setUseEkyc] = useState(false);
   const [generating, setGenerating] = useState(false);
   // Validation/error messages surface as an inline banner (see ErrorBanner
@@ -1101,6 +1184,25 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         <h2 className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy, fontFamily: serif }}>
           {document.doc_name} Application
         </h2>
+
+        <div className="sticky top-0 z-10 flex gap-1.5 flex-wrap -mx-1 px-1 py-2" style={{ background: theme.card }}>
+          {[
+            { label: "Applicants", ref: applicantsSectionRef },
+            { label: "Loan Details", ref: loanDetailsSectionRef },
+            { label: "Documents", ref: documentsSectionRef },
+          ].map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => scrollToSection(s.ref)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors hover:opacity-80"
+              style={{ borderColor: theme.border, color: theme.navy, background: theme.bg }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Language</label>
           <select value={language} onChange={e => setLanguage(e.target.value)} className={inputClass} style={baseInputStyle}>
@@ -1180,7 +1282,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           </div>
         )}
 
-        <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
+        <div ref={applicantsSectionRef} className="pt-4 border-t scroll-mt-16" style={{ borderColor: theme.border }}>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
             <h3 className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.navy }}>Applicant Management</h3>
             <div className="flex gap-2">
@@ -1219,7 +1321,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           ))}
         </div>
 
-        <div>
+        <div ref={loanDetailsSectionRef} className="scroll-mt-16">
           <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Loan Details</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
@@ -1260,7 +1362,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           onChange={updateTypeField}
         />
 
-        <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
+        <div ref={documentsSectionRef} className="pt-4 border-t scroll-mt-16" style={{ borderColor: theme.border }}>
           <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Documents Checklist</h3>
           {checklistLoading ? (
             <p className="text-xs" style={{ color: theme.slate }}>Loading checklist...</p>
@@ -1288,7 +1390,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
         <ErrorBanner message={formError} />
 
-        <div className="flex gap-2 mt-4 pt-4 border-t" style={{ borderColor: theme.border }}>
+        <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
           <button onClick={onCancel} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Cancel</button>
           <button disabled={generating || (useEkyc && ekycStage !== "done")} onClick={handleGenerateDraft} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
             {generating ? "Generating..." : "Generate Draft"}
@@ -1332,7 +1434,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
         <ErrorBanner message={formError} />
 
-        <div className="flex gap-2 mt-4 pt-4 border-t" style={{ borderColor: theme.border }}>
+        <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
           <button onClick={() => { setFormError(null); setStep(1); }} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Back</button>
           <button onClick={handleFinalize} className="px-5 py-2.5 rounded text-sm font-semibold text-white" style={{ background: theme.navy }}>
             {requireEsign ? "Send for eSign" : "Save Document"}

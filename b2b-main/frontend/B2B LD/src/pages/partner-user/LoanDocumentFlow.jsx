@@ -638,6 +638,28 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
   );
 };
 
+// Inline validation/error banner — matches PartnerUserCreateOrder.jsx's own
+// error styling (theme.danger/dangerSoft) rather than a native alert()
+// popup. `message` is a single string, or an array to render as a bulleted
+// "here's everything still missing" list.
+const ErrorBanner = ({ message }) => {
+  if (!message) return null;
+  return (
+    <div className="rounded p-3 text-sm" style={{ background: theme.dangerSoft, border: `1px solid ${theme.danger}33`, color: theme.danger }}>
+      {Array.isArray(message) ? (
+        <>
+          <p className="font-semibold mb-1">Please fill in the following required fields:</p>
+          <ul className="list-disc list-inside space-y-0.5">
+            {message.map((m) => <li key={m}>{m}</li>)}
+          </ul>
+        </>
+      ) : (
+        <p>{message}</p>
+      )}
+    </div>
+  );
+};
+
 export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ekycService }) {
   // The org's already-configured eKYC price (organization_service_pricing) —
   // never re-entered or hardcoded here. undefined/not assigned means the org
@@ -649,6 +671,11 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const [language, setLanguage] = useState("English");
   const [useEkyc, setUseEkyc] = useState(false);
   const [generating, setGenerating] = useState(false);
+  // Validation/error messages surface as an inline banner (see ErrorBanner
+  // below), matching PartnerUserCreateOrder.jsx's own error-display
+  // convention — never a native alert()/confirm() popup. A string for a
+  // single message, or an array for "here's everything still missing".
+  const [formError, setFormError] = useState(null);
   const [generatedPdfBytes, setGeneratedPdfBytes] = useState(null);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null);
 
@@ -961,9 +988,10 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const handleGenerateDraft = async () => {
     const missingFields = getMissingRequiredFields();
     if (missingFields.length > 0) {
-      alert("Please fill in the following required fields before generating the draft:\n\n" + missingFields.join("\n"));
+      setFormError(missingFields);
       return;
     }
+    setFormError(null);
     setGenerating(true);
     try {
       // Collect every loan-type dynamic field the backend renders (vehicle/
@@ -1001,7 +1029,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
       setGeneratedParties(parties);
       setStep(2);
     } catch (err) {
-      alert("Error generating draft: " + err.message);
+      setFormError("Error generating draft: " + err.message);
     } finally {
       setGenerating(false);
     }
@@ -1017,13 +1045,14 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
     // except eKYC/eSign (see partner.py's _create_order) — this order is
     // always created as "Document Service", so it's never exempt.
     if (!isValidEmail(customerEmail)) {
-      alert("A valid email address is required for the Applicant (Present Address > Email) to save this order.");
+      setFormError("A valid email address is required for the Applicant (Present Address > Email) to save this order.");
       return;
     }
     if (requireEsign && !isValidMobile(customerMobile)) {
-      alert("A valid 10-digit mobile number is required for the Applicant (Present Address > Mobile) to send this for eSign.");
+      setFormError("A valid 10-digit mobile number is required for the Applicant (Present Address > Mobile) to send this for eSign.");
       return;
     }
+    setFormError(null);
     const file = new File([generatedPdfBytes], `${document.doc_name.replace(/\s+/g, '_')}.pdf`, { type: "application/pdf" });
 
     // One eSign signer per party that entered a valid mobile number —
@@ -1257,6 +1286,8 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           <p className="text-xs" style={{ color: theme.slate }}>Complete Applicant identity verification above before generating the draft.</p>
         )}
 
+        <ErrorBanner message={formError} />
+
         <div className="flex gap-2 mt-4 pt-4 border-t" style={{ borderColor: theme.border }}>
           <button onClick={onCancel} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Cancel</button>
           <button disabled={generating || (useEkyc && ekycStage !== "done")} onClick={handleGenerateDraft} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
@@ -1299,8 +1330,10 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           )}
         </div>
 
+        <ErrorBanner message={formError} />
+
         <div className="flex gap-2 mt-4 pt-4 border-t" style={{ borderColor: theme.border }}>
-          <button onClick={() => setStep(1)} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Back</button>
+          <button onClick={() => { setFormError(null); setStep(1); }} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Back</button>
           <button onClick={handleFinalize} className="px-5 py-2.5 rounded text-sm font-semibold text-white" style={{ background: theme.navy }}>
             {requireEsign ? "Send for eSign" : "Save Document"}
           </button>

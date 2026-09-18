@@ -26,6 +26,47 @@ const INDIAN_STATES = [
   "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
 ];
 
+// District suggestions per state — NOT a locked dropdown (see District's
+// `type: "suggest"` in PARTY_ADDRESS_FIELDS below): the District input
+// stays free text, this just narrows the autocomplete list to the
+// currently-selected state's districts once one is picked, and the user
+// can still type anything the list doesn't have (a renamed/split/new
+// district). Union Territories aren't included (too few districts each to
+// be worth listing). Source: user-supplied list compiled from GoI's
+// Integrated Government Online Directory (I-God), 2026-09 — the same
+// staleness risk as any hardcoded district list applies, softened by this
+// being suggestions rather than a hard constraint.
+const STATE_DISTRICTS = {
+  "Andhra Pradesh": ["Alluri Sitharama Raju", "Anakapalli", "Ananthapuramu", "Annamayya", "Bapatla", "Chittoor", "Dr. B.R. Ambedkar Konaseema", "East Godavari", "Eluru", "Guntur", "Kakinada", "Krishna", "Kurnool", "Markapuram", "Nandyal", "NTR", "Palnadu", "Parvathipuram Manyam", "Polavaram", "Prakasam", "Sri Potti Sriramulu Nellore", "Sri Sathya Sai", "Srikakulam", "Tirupati", "Visakhapatnam", "Vizianagaram", "West Godavari", "YSR Kadapa"],
+  "Arunachal Pradesh": ["Anjaw", "Bichom", "Changlang", "Dibang Valley", "East Kameng", "East Siang", "Kamle", "Keyi Panyor", "Kra Daadi", "Kurung Kumey", "Leparada", "Lohit", "Longding", "Lower Dibang Valley", "Lower Siang", "Lower Subansiri", "Namsai", "Pakke Kessang", "Papum Pare", "Shi Yomi", "Siang", "Tawang", "Tirap", "Upper Siang", "Upper Subansiri", "West Kameng", "West Siang"],
+  "Assam": ["Bajali", "Baksa", "Barpeta", "Biswanath", "Bongaigaon", "Cachar", "Charaideo", "Chirang", "Darrang", "Dhemaji", "Dhubri", "Dibrugarh", "Dima Hasao", "Goalpara", "Golaghat", "Hailakandi", "Hojai", "Jorhat", "Kamrup", "Kamrup Metropolitan", "Karbi Anglong", "Kokrajhar", "Lakhimpur", "Majuli", "Morigaon", "Nagaon", "Nalbari", "Sivasagar", "Sonitpur", "South Salmara-Mankachar", "Tamulpur", "Tinsukia", "Udalguri", "Sribhumi", "West Karbi Anglong"],
+  "Bihar": ["Araria", "Arwal", "Aurangabad", "Banka", "Begusarai", "Bhagalpur", "Bhojpur", "Buxar", "Darbhanga", "Gaya", "Gopalganj", "Jamui", "Jehanabad", "Kaimur", "Katihar", "Khagaria", "Kishanganj", "Lakhisarai", "Madhepura", "Madhubani", "Munger", "Muzaffarpur", "Nalanda", "Nawada", "Pashchim Champaran", "Patna", "Purba Champaran", "Purnia", "Rohtas", "Saharsa", "Samastipur", "Saran", "Sheikhpura", "Sheohar", "Sitamarhi", "Siwan", "Supaul", "Vaishali"],
+  "Chhattisgarh": ["Balod", "Balodabazar-Bhatapara", "Balrampur-Ramanujganj", "Bastar", "Bemetara", "Bijapur", "Bilaspur", "Dakshin Bastar Dantewada", "Dhamtari", "Durg", "Gariyaband", "Gaurela-Pendra-Marwahi", "Janjgir-Champa", "Jashpur", "Kabeerdham", "Khairagarh-Chhuikhadan-Gandai", "Kondagaon", "Korba", "Korea", "Mahasamund", "Manendragarh-Chirmiri-Bharatpur", "Mohla-Manpur-Ambagarh Chouki", "Mungeli", "Narayanpur", "Raigarh", "Raipur", "Rajnandgaon", "Sakti", "Sarangarh-Bilaigarh", "Surajpur", "Surguja", "Sukma", "Uttar Bastar Kanker"],
+  "Goa": ["Kushavati", "North Goa", "South Goa"],
+  "Gujarat": ["Ahmedabad", "Amreli", "Anand", "Arvalli", "Banas Kantha", "Bharuch", "Bhavnagar", "Botad", "Chhota Udepur", "Dahod", "Dang", "Devbhumi Dwarka", "Gandhinagar", "Gir Somnath", "Jamnagar", "Junagadh", "Kachchh", "Kheda", "Mahesana", "Mahisagar", "Morbi", "Narmada", "Navsari", "Panch Mahals", "Patan", "Porbandar", "Rajkot", "Sabarkantha", "Surat", "Surendranagar", "Tapi", "Vadodara", "Valsad", "Banaskantha"],
+  "Haryana": ["Ambala", "Bhiwani", "Charkhi Dadri", "Faridabad", "Fatehabad", "Gurugram", "Hansi", "Hisar", "Jhajjar", "Jind", "Kaithal", "Karnal", "Kurukshetra", "Mahendragarh", "Nuh", "Palwal", "Panchkula", "Panipat", "Rewari", "Rohtak", "Sirsa", "Sonipat", "Yamunanagar"],
+  "Himachal Pradesh": ["Bilaspur", "Chamba", "Hamirpur", "Kangra", "Kinnaur", "Kullu", "Lahaul and Spiti", "Mandi", "Shimla", "Sirmaur", "Solan", "Una"],
+  "Jharkhand": ["Bokaro", "Chatra", "Deoghar", "Dhanbad", "Dumka", "East Singhbhum", "Garhwa", "Giridih", "Godda", "Gumla", "Hazaribagh", "Jamtara", "Khunti", "Koderma", "Latehar", "Lohardaga", "Pakur", "Palamu", "Ramgarh", "Ranchi", "Sahibganj", "Saraikela Kharsawan", "Simdega", "West Singhbhum"],
+  "Karnataka": ["Bagalkote", "Ballari", "Belagavi", "Bengaluru Rural", "Bengaluru Urban", "Bengaluru South", "Bidar", "Chamarajanagar", "Chikkaballapura", "Chikkamagaluru", "Chitradurga", "Dakshina Kannada", "Davanagere", "Dharwad", "Gadag", "Hassan", "Haveri", "Kalaburagi", "Kodagu", "Kolar", "Koppal", "Mandya", "Mysuru", "Raichur", "Ramanagara", "Shivamogga", "Tumakuru", "Udupi", "Uttara Kannada", "Vijayapura", "Yadgir"],
+  "Kerala": ["Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kasaragod", "Kollam", "Kottayam", "Kozhikode", "Malappuram", "Palakkad", "Pathanamthitta", "Thiruvananthapuram", "Thrissur", "Wayanad"],
+  "Madhya Pradesh": ["Agar-Malwa", "Alirajpur", "Anuppur", "Ashoknagar", "Balaghat", "Barwani", "Betul", "Bhind", "Bhopal", "Burhanpur", "Chhatarpur", "Chhindwara", "Damoh", "Datia", "Dewas", "Dhar", "Dindori", "Guna", "Gwalior", "Harda", "Indore", "Jabalpur", "Jhabua", "Katni", "Khandwa", "Khargone", "Maihar", "Mandla", "Mandsaur", "Mauganj", "Morena", "Narmadapuram", "Narsinghpur", "Neemuch", "Niwari", "Panna", "Raisen", "Rajgarh", "Ratlam", "Rewa", "Sagar", "Satna", "Sehore", "Seoni", "Shahdol", "Shajapur", "Sheopur", "Shivpuri", "Sidhi", "Singrauli", "Tikamgarh", "Ujjain", "Umaria", "Vidisha", "Pandhurna"],
+  "Maharashtra": ["Ahilyanagar", "Akola", "Amravati", "Beed", "Bhandara", "Buldhana", "Chandrapur", "Chhatrapati Sambhajinagar", "Dharashiv", "Dhule", "Gadchiroli", "Gondia", "Hingoli", "Jalgaon", "Jalna", "Kolhapur", "Latur", "Mumbai", "Mumbai Suburban", "Nagpur", "Nanded", "Nandurbar", "Nashik", "Palghar", "Parbhani", "Pune", "Raigad", "Ratnagiri", "Sangli", "Satara", "Sindhudurg", "Solapur", "Thane", "Wardha", "Washim", "Yavatmal"],
+  "Manipur": ["Bishnupur", "Chandel", "Churachandpur", "Imphal East", "Imphal West", "Jiribam", "Kakching", "Kamjong", "Kangpokpi", "Noney", "Pherzawl", "Senapati", "Tamenglong", "Tengnoupal", "Thoubal", "Ukhrul"],
+  "Meghalaya": ["East Garo Hills", "East Jaintia Hills", "East Khasi Hills", "Eastern West Khasi Hills", "North Garo Hills", "Ri Bhoi", "South Garo Hills", "South West Garo Hills", "South West Khasi Hills", "West Garo Hills", "West Jaintia Hills", "West Khasi Hills"],
+  "Mizoram": ["Aizawl", "Champhai", "Hnahthial", "Khawzawl", "Kolasib", "Lawngtlai", "Lunglei", "Mamit", "Saiha", "Saitual", "Serchhip"],
+  "Nagaland": ["Chümoukedima", "Dimapur", "Kiphire", "Kohima", "Longleng", "Meluri", "Mokokchung", "Mon", "Niuland", "Noklak", "Peren", "Phek", "Shamator", "Tseminyu", "Tuensang", "Wokha", "Zunheboto"],
+  "Odisha": ["Angul", "Boudh", "Balangir", "Bargarh", "Balasore", "Bhadrak", "Cuttack", "Deogarh", "Dhenkanal", "Gajapati", "Ganjam", "Jagatsinghpur", "Jajpur", "Jharsuguda", "Kalahandi", "Kandhamal", "Kendrapara", "Kendujhar", "Khordha", "Koraput", "Malkangiri", "Mayurbhanj", "Nabarangpur", "Nayagarh", "Nuapada", "Puri", "Rayagada", "Sambalpur", "Subarnapur", "Sundargarh"],
+  "Punjab": ["Amritsar", "Barnala", "Bathinda", "Faridkot", "Fatehgarh Sahib", "Fazilka", "Ferozepur", "Gurdaspur", "Hoshiarpur", "Jalandhar", "Kapurthala", "Ludhiana", "Malerkotla", "Mansa", "Moga", "Muktsar", "Pathankot", "Patiala", "Rupnagar", "Sahibzada Ajit Singh Nagar", "Sangrur", "Shaheed Bhagat Singh Nagar", "Tarn Taran"],
+  "Rajasthan": ["Ajmer", "Alwar", "Balotra", "Banswara", "Baran", "Barmer", "Beawar", "Bharatpur", "Bhilwara", "Bikaner", "Bundi", "Chittorgarh", "Churu", "Dausa", "Deeg", "Dholpur", "Didwana-Kuchamana", "Dudu", "Dungarpur", "Ganganagar", "Hanumangarh", "Jaipur", "Jaipur Rural", "Jaisalmer", "Jalore", "Jhalawar", "Jhunjhunu", "Jodhpur", "Jodhpur Rural", "Karauli", "Kekri", "Kota", "Kotputli-Behror", "Nagaur", "Pali", "Phalodi", "Pratapgarh", "Rajsamand", "Sawai Madhopur", "Sikar", "Sirohi", "Tonk", "Udaipur"],
+  "Sikkim": ["Gangtok", "Gyalshing", "Mangan", "Namchi", "Pakyong", "Soreng"],
+  "Tamil Nadu": ["Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri", "Dindigul", "Erode", "Kallakurichi", "Kancheepuram", "Karur", "Krishnagiri", "Madurai", "Mayiladuthurai", "Nagapattinam", "Kanniyakumari", "Namakkal", "Perambalur", "Pudukottai", "Ramanathapuram", "Ranipet", "Salem", "Sivaganga", "Tenkasi", "Thanjavur", "Theni", "Thoothukudi", "Tiruchirappalli", "Thirunelveli", "Tirupathur", "Tiruppur", "Tiruvallur", "Tiruvannamalai", "Tiruvarur", "Vellore", "Viluppuram", "Virudhunagar", "The Nilgiris"],
+  "Telangana": ["Adilabad", "Bhadradri Kothagudem", "Hanamkonda", "Hyderabad", "Jagtial", "Jangaon", "Jayashankar Bhupalpally", "Jogulamba Gadwal", "Kamareddy", "Karimnagar", "Khammam", "Komaram Bheem Asifabad", "Mahabubabad", "Mahabubnagar", "Mancherial", "Medak", "Medchal-Malkajgiri", "Mulugu", "Nagarkurnool", "Nalgonda", "Narayanpet", "Nirmal", "Nizamabad", "Peddapalli", "Rajanna Sircilla", "Rangareddy", "Sangareddy", "Siddipet", "Suryapet", "Vikarabad", "Wanaparthy", "Warangal", "Yadadri Bhuvanagiri"],
+  "Tripura": ["Dhalai", "Gomati", "Khowai", "North Tripura", "Sepahijala", "South Tripura", "Unakoti", "West Tripura"],
+  "Uttar Pradesh": ["Agra", "Aligarh", "Ambedkar Nagar", "Amethi", "Amroha", "Auraiya", "Ayodhya", "Azamgarh", "Baghpat", "Bahraich", "Ballia", "Balrampur", "Banda", "Barabanki", "Bareilly", "Basti", "Bhadohi", "Bijnor", "Budaun", "Bulandshahr", "Chandauli", "Chitrakoot", "Deoria", "Etah", "Etawah", "Farrukhabad", "Fatehpur", "Firozabad", "Gautam Buddha Nagar", "Ghaziabad", "Ghazipur", "Gonda", "Gorakhpur", "Hamirpur", "Hapur", "Hardoi", "Hathras", "Jalaun", "Jaunpur", "Jhansi", "Kannauj", "Kanpur Dehat", "Kanpur Nagar", "Kasganj", "Kaushambi", "Kushinagar", "Lakhimpur Kheri", "Lalitpur", "Lucknow", "Maharajganj", "Mahoba", "Mainpuri", "Mathura", "Mau", "Meerut", "Mirzapur", "Moradabad", "Muzaffarnagar", "Pilibhit", "Pratapgarh", "Prayagraj", "Rae Bareli", "Rampur", "Saharanpur", "Sambhal", "Sant Kabir Nagar", "Shahjahanpur", "Shamli", "Shravasti", "Siddharthnagar", "Sitapur", "Sonbhadra", "Sultanpur", "Unnao", "Varanasi"],
+  "Uttarakhand": ["Almora", "Bageshwar", "Chamoli", "Champawat", "Dehradun", "Haridwar", "Nainital", "Pauri Garhwal", "Pithoragarh", "Rudraprayag", "Tehri Garhwal", "Udham Singh Nagar", "Uttarkashi"],
+  "West Bengal": ["Alipurduar", "Bankura", "Paschim Bardhaman", "Purba Bardhaman", "Birbhum", "Cooch Behar", "Dakshin Dinajpur", "Darjeeling", "Hooghly", "Howrah", "Jalpaiguri", "Jhargram", "Kalimpong", "Kolkata", "Maldah", "Murshidabad", "Nadia", "North 24 Parganas", "Paschim Medinipur", "Purba Medinipur", "South 24 Parganas", "Uttar Dinajpur"],
+};
+
 // India Post's public pincode API — used to auto-fill City/District/State
 // from a 6-digit PIN code instead of a hand-maintained district dropdown
 // (see INDIAN_STATES comment above for why). Small in-memory cache so
@@ -350,8 +391,11 @@ const SectionFieldGrid = ({ title, fields, values, onChange }) => (
 // Generic input for a small field descriptor ({key,label,type,options}) —
 // used everywhere inside PartyCard (Personal/Address/Employment/row tables),
 // as opposed to FieldInput above which looks up loan-type-specific fields by
-// key in the module-level FIELD_TYPES dict.
-const SimpleInput = ({ field, value, onChange }) => {
+// key in the module-level FIELD_TYPES dict. `suggestions`/`datalistId`
+// (District only, see FieldGrid) render an <input list> + <datalist> —
+// autocomplete, not a locked <select>, so a district the list doesn't have
+// can still just be typed.
+const SimpleInput = ({ field, value, onChange, suggestions, datalistId }) => {
   if (field.type === "select") {
     return (
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} style={baseInputStyle}>
@@ -362,28 +406,44 @@ const SimpleInput = ({ field, value, onChange }) => {
   }
   const inputType = field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text";
   return (
-    <input
-      type={inputType}
-      value={value || ""}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={field.placeholder}
-      maxLength={field.maxLength}
-      className={inputClass}
-      style={baseInputStyle}
-    />
+    <>
+      <input
+        type={inputType}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.placeholder}
+        maxLength={field.maxLength}
+        list={suggestions ? datalistId : undefined}
+        className={inputClass}
+        style={baseInputStyle}
+      />
+      {suggestions && (
+        <datalist id={datalistId}>
+          {suggestions.map((o) => <option key={o} value={o} />)}
+        </datalist>
+      )}
+    </>
   );
 };
 
-const FieldGrid = ({ fields, values, onChange }) => (
+// `blockId` must be unique per FieldGrid instance on the page (e.g.
+// "0-present", "1-permanent") so each address block's District datalist
+// gets its own DOM id — otherwise two parties' datalists would collide.
+const FieldGrid = ({ fields, values, onChange, blockId }) => (
   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-    {fields.map((f) => (
-      <div key={f.key}>
-        <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
-          {f.label}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
-        </label>
-        <SimpleInput field={f} value={values?.[f.key]} onChange={(v) => onChange(f.key, v)} />
-      </div>
-    ))}
+    {fields.map((f) => {
+      const isDistrict = f.key === "district";
+      const suggestions = isDistrict ? STATE_DISTRICTS[values?.state] : undefined;
+      const datalistId = isDistrict && blockId ? `district-options-${blockId}` : undefined;
+      return (
+        <div key={f.key}>
+          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
+            {f.label}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
+          </label>
+          <SimpleInput field={f} value={values?.[f.key]} onChange={(v) => onChange(f.key, v)} suggestions={suggestions} datalistId={datalistId} />
+        </div>
+      );
+    })}
   </div>
 );
 
@@ -417,7 +477,7 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
   );
 };
 
-const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
+const PartyCard = ({ party, partyIndex, roleLabel, removable, onRemove, onChange }) => {
   const updatePersonal = (key, value) => onChange({ ...party, personal: { ...party.personal, [key]: value } });
   const updateEmployment = (key, value) => onChange({ ...party, employment: { ...party.employment, [key]: value } });
 
@@ -487,7 +547,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
         <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
           <h4 className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: theme.navy }}>Address</h4>
           <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Present Address</p>
-          <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} />
+          <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} blockId={`${partyIndex}-present`} />
 
           <label className="flex items-center gap-2 mt-3 text-xs font-semibold" style={{ color: theme.ink }}>
             <input type="checkbox" checked={party.address.permanent_same_as_present} onChange={(e) => togglePermanentSame(e.target.checked)} />
@@ -496,7 +556,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
           {!party.address.permanent_same_as_present && (
             <div className="mt-2">
               <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Permanent Address</p>
-              <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.permanent} onChange={updatePermanent} />
+              <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.permanent} onChange={updatePermanent} blockId={`${partyIndex}-permanent`} />
             </div>
           )}
 
@@ -507,7 +567,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
           {party.address.office && (
             <div className="mt-2">
               <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Office / Business Address</p>
-              <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.office} onChange={updateOffice} />
+              <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.office} onChange={updateOffice} blockId={`${partyIndex}-office`} />
             </div>
           )}
         </div>
@@ -1037,6 +1097,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           {partyRows.map(({ party, idx, label }) => (
             <PartyCard
               key={idx}
+              partyIndex={idx}
               party={party}
               roleLabel={label}
               removable={party.role !== "applicant"}

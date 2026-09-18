@@ -13,6 +13,42 @@ const EKYC_DOC_TYPES = [
 
 const REPAYMENT_FREQUENCIES = ["Monthly", "Quarterly", "Half-Yearly", "Yearly"];
 
+// States/UTs — a stable, rarely-changing list, safe to hardcode (unlike
+// districts, which the GoI reorganizes/renames often enough that a static
+// list would silently go stale — see the pincode-based lookup below for
+// District/City instead).
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
+  "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
+  "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi",
+  "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
+];
+
+// India Post's public pincode API — used to auto-fill City/District/State
+// from a 6-digit PIN code instead of a hand-maintained district dropdown
+// (see INDIAN_STATES comment above for why). Small in-memory cache so
+// re-typing/correcting a digit doesn't re-fetch the same pincode.
+const _pincodeCache = new Map();
+
+async function lookupPincode(pincode) {
+  if (_pincodeCache.has(pincode)) return _pincodeCache.get(pincode);
+  let result = null;
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+    const data = await res.json();
+    const postOffice = data?.[0]?.Status === "Success" ? data[0].PostOffice?.[0] : null;
+    if (postOffice) {
+      result = { city: postOffice.Name || "", district: postOffice.District || "", state: postOffice.State || "" };
+    }
+  } catch {
+    result = null; // offline / API unavailable — leave fields as the user typed them
+  }
+  _pincodeCache.set(pincode, result);
+  return result;
+}
+
 const ROLE_LABELS = { applicant: "Applicant", co_applicant: "Co-Applicant", guarantor: "Guarantor" };
 const MAX_CO_APPLICANTS = 3;
 const MAX_GUARANTORS = 2;
@@ -67,7 +103,7 @@ const FIELD_TYPES = {
   village: { label: "Village", type: "text" },
   taluk: { label: "Taluk", type: "text" },
   district: { label: "District", type: "text" },
-  state: { label: "State", type: "text" },
+  state: { label: "State", type: "select", options: INDIAN_STATES },
   land_ownership: { label: "Land Ownership", type: "select", options: ["Owned", "Leased", "Co-owned / Family"] },
   total_land_area: { label: "Total Land Area / Acreage", type: "text" },
   cultivated_area: { label: "Cultivated Area", type: "text" },
@@ -182,8 +218,8 @@ const PARTY_ADDRESS_FIELDS = [
   { key: "landmark", label: "Landmark", type: "text" },
   { key: "city", label: "City", type: "text" },
   { key: "district", label: "District", type: "text" },
-  { key: "state", label: "State", type: "text" },
-  { key: "pincode", label: "Pincode", type: "text" },
+  { key: "state", label: "State", type: "select", options: INDIAN_STATES },
+  { key: "pincode", label: "Pincode", type: "text", placeholder: "6-digit PIN — fills City/District/State", maxLength: 6 },
   { key: "country", label: "Country", type: "text" },
   { key: "mobile", label: "Mobile Number", type: "text" },
   { key: "email", label: "Email", type: "email" },
@@ -325,7 +361,17 @@ const SimpleInput = ({ field, value, onChange }) => {
     );
   }
   const inputType = field.type === "number" ? "number" : field.type === "date" ? "date" : field.type === "email" ? "email" : "text";
-  return <input type={inputType} value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} style={baseInputStyle} />;
+  return (
+    <input
+      type={inputType}
+      value={value || ""}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={field.placeholder}
+      maxLength={field.maxLength}
+      className={inputClass}
+      style={baseInputStyle}
+    />
+  );
 };
 
 const FieldGrid = ({ fields, values, onChange }) => (
@@ -374,9 +420,46 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
 const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
   const updatePersonal = (key, value) => onChange({ ...party, personal: { ...party.personal, [key]: value } });
   const updateEmployment = (key, value) => onChange({ ...party, employment: { ...party.employment, [key]: value } });
-  const updatePresent = (key, value) => onChange({ ...party, address: { ...party.address, present: { ...party.address.present, [key]: value } } });
-  const updatePermanent = (key, value) => onChange({ ...party, address: { ...party.address, permanent: { ...(party.address.permanent || emptyAddressBlock()), [key]: value } } });
-  const updateOffice = (key, value) => onChange({ ...party, address: { ...party.address, office: { ...(party.address.office || emptyAddressBlock()), [key]: value } } });
+
+  // On a valid 6-digit PIN, fetch City/District/State and merge them into
+  // that same address block once the lookup resolves — via a functional
+  // update (see updateParty above) so a slow response can't stomp on
+  // edits made to other fields in the meantime. Overwrites City/District/
+  // State with the lookup result (that's the point of auto-fill); the
+  // user can still edit any of the three afterward if the PIN maps to the
+  // wrong locality.
+  const autofillFromPincode = (blockKey, pincode) => {
+    if (!/^\d{6}$/.test(pincode)) return;
+    lookupPincode(pincode).then((result) => {
+      if (!result) return;
+      onChange((prevParty) => ({
+        ...prevParty,
+        address: {
+          ...prevParty.address,
+          [blockKey]: {
+            ...(prevParty.address[blockKey] || emptyAddressBlock()),
+            pincode,
+            ...(result.city ? { city: result.city } : {}),
+            ...(result.district ? { district: result.district } : {}),
+            ...(result.state ? { state: result.state } : {}),
+          },
+        },
+      }));
+    });
+  };
+
+  const updatePresent = (key, value) => {
+    onChange({ ...party, address: { ...party.address, present: { ...party.address.present, [key]: value } } });
+    if (key === "pincode") autofillFromPincode("present", value);
+  };
+  const updatePermanent = (key, value) => {
+    onChange({ ...party, address: { ...party.address, permanent: { ...(party.address.permanent || emptyAddressBlock()), [key]: value } } });
+    if (key === "pincode") autofillFromPincode("permanent", value);
+  };
+  const updateOffice = (key, value) => {
+    onChange({ ...party, address: { ...party.address, office: { ...(party.address.office || emptyAddressBlock()), [key]: value } } });
+    if (key === "pincode") autofillFromPincode("office", value);
+  };
   const togglePermanentSame = (same) => onChange({ ...party, address: { ...party.address, permanent_same_as_present: same, permanent: same ? null : emptyAddressBlock() } });
   const toggleOffice = (has) => onChange({ ...party, address: { ...party.address, office: has ? emptyAddressBlock() : null } });
   const setRows = (key, rows) => onChange({ ...party, [key]: rows });
@@ -477,7 +560,15 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const [parties, setParties] = useState([emptyParty("applicant")]);
   const addParty = (role) => setParties((prev) => [...prev, emptyParty(role)]);
   const removeParty = (index) => setParties((prev) => prev.filter((_, i) => i !== index));
-  const updateParty = (index, updated) => setParties((prev) => prev.map((p, i) => (i === index ? updated : p)));
+  // `updated` may be a plain party object (every synchronous edit) or an
+  // updater function `(prevParty) => nextParty` (the pincode auto-fill
+  // below, whose API response can resolve after other edits have already
+  // happened — a function reads the LATEST party at merge time instead of
+  // clobbering it with whatever was captured in a stale closure).
+  const updateParty = (index, updated) => setParties((prev) => prev.map((p, i) => {
+    if (i !== index) return p;
+    return typeof updated === "function" ? updated(p) : updated;
+  }));
 
   const coApplicantCount = parties.filter((p) => p.role === "co_applicant").length;
   const guarantorCount = parties.filter((p) => p.role === "guarantor").length;

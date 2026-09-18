@@ -82,6 +82,21 @@ const STATE_DISTRICTS = {
 // re-typing/correcting a digit doesn't re-fetch the same pincode.
 const _pincodeCache = new Map();
 
+// State/District are now locked <select> dropdowns (see FieldGrid), so a
+// pincode lookup result is only useful if it's one of the actual option
+// strings — India Post's naming doesn't always match GoI's exactly (e.g.
+// "Bangalore" vs "Bengaluru Urban"). Exact match first, then a loose
+// substring match either direction; "" (blank, falls back to the
+// placeholder) if nothing lines up, rather than setting a value the
+// dropdown can't actually display.
+function matchFromList(list, raw) {
+  if (!raw) return "";
+  const normalized = raw.trim().toLowerCase();
+  const exact = list.find((o) => o.toLowerCase() === normalized);
+  if (exact) return exact;
+  return list.find((o) => o.toLowerCase().includes(normalized) || normalized.includes(o.toLowerCase())) || "";
+}
+
 async function lookupPincode(pincode) {
   if (_pincodeCache.has(pincode)) return _pincodeCache.get(pincode);
   let result = null;
@@ -90,7 +105,9 @@ async function lookupPincode(pincode) {
     const data = await res.json();
     const postOffice = data?.[0]?.Status === "Success" ? data[0].PostOffice?.[0] : null;
     if (postOffice) {
-      result = { city: postOffice.Name || "", district: postOffice.District || "", state: postOffice.State || "" };
+      const matchedState = matchFromList(INDIAN_STATES, postOffice.State);
+      const matchedDistrict = matchedState ? matchFromList(STATE_DISTRICTS[matchedState] || [], postOffice.District) : "";
+      result = { city: postOffice.Name || "", district: matchedDistrict, state: matchedState };
     }
   } catch {
     result = null; // offline / API unavailable — leave fields as the user typed them

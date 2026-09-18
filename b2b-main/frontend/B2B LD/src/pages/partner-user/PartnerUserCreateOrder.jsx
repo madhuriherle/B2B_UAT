@@ -1837,7 +1837,7 @@ const PartnerUserCreateOrder = () => {
           </>
         ) : (isDocumentService && selectedDocument && (selectedDocument.category_name === 'Loan Documents' || selectedDocument.doc_name.toLowerCase().includes('loan'))) || (form.service_name && form.service_name.toLowerCase().includes('loan')) ? (
           <LoanDocumentFlow
-            document={selectedDocument || { doc_name: form.service_name, config_id: null, doc_id: null, available_languages: ["English", "Hindi"] }}
+            document={selectedDocument || { doc_name: form.service_name, config_id: null, doc_id: null, available_languages: ["English", "Hindi", "Kannada", "Marathi"] }}
             ekycService={services.find((s) => s.service_name === "eKYC")}
             onCancel={() => {
               if (selectedDocument) setSelectedDocument(null);

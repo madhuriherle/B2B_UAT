@@ -5,7 +5,7 @@ import { isValidMobile, isValidEmail } from "../../lib/validation";
 import { renderableEkycFields } from "../../lib/ekycFields";
 import {
   User, UserPlus, ShieldCheck, IdCard, MapPin, Briefcase, Wallet, CreditCard, Landmark, Gem, Contact, Plus,
-  Upload, FileCheck2, X,
+  Upload, FileCheck2, X, Download,
 } from "lucide-react";
 
 const inputClass = "w-full px-4 py-2.5 text-sm rounded outline-none transition-all disabled:cursor-not-allowed";
@@ -161,9 +161,9 @@ const SectionHeading = ({ title }) => {
 // loans/bank accounts/assets/references) are handled separately below by
 // PartyCard, since they repeat once per Applicant/Co-Applicant/Guarantor.
 const FIELD_TYPES = {
-  property_address: { label: "Property Address", type: "text" },
-  property_type: { label: "Property Type", type: "select", options: ["Residential", "Commercial", "Plot / Land", "Under Construction"] },
-  property_value: { label: "Property Value", type: "number" },
+  property_address: { label: "Property Address", type: "text", required: true },
+  property_type: { label: "Property Type", type: "select", options: ["Residential", "Commercial", "Plot / Land", "Under Construction"], required: true },
+  property_value: { label: "Property Value", type: "number", required: true },
   purchase_price: { label: "Purchase Price", type: "number" },
   down_payment: { label: "Down Payment", type: "number" },
   seller_builder_name: { label: "Seller / Builder Name", type: "text" },
@@ -175,18 +175,18 @@ const FIELD_TYPES = {
   mortgage_security_details: { label: "Mortgage / Security Details", type: "text" },
   insurance_details: { label: "Insurance Details", type: "text" },
 
-  vehicle_type: { label: "Vehicle Type", type: "text" },
+  vehicle_type: { label: "Vehicle Type", type: "text", required: true },
   new_or_used: { label: "New / Used", type: "select", options: ["New", "Used"] },
-  manufacturer: { label: "Manufacturer / Make", type: "text" },
-  brand_model: { label: "Brand / Model", type: "text" },
+  manufacturer: { label: "Manufacturer / Make", type: "text", required: true },
+  brand_model: { label: "Brand / Model", type: "text", required: true },
   variant: { label: "Variant", type: "text" },
   manufacturing_year: { label: "Manufacturing Year", type: "text" },
   registration_number: { label: "Registration Number", type: "text" },
   chassis_number: { label: "Chassis Number", type: "text" },
   engine_number: { label: "Engine Number", type: "text" },
-  ex_showroom_price: { label: "Ex-Showroom Price", type: "number" },
+  ex_showroom_price: { label: "Ex-Showroom Price", type: "number", required: true },
   on_road_price: { label: "On-Road Price", type: "number" },
-  dealer_name: { label: "Dealer Name", type: "text" },
+  dealer_name: { label: "Dealer Name", type: "text", required: true },
   dealer_address: { label: "Dealer Address", type: "text" },
   dealer_contact: { label: "Dealer Contact", type: "text" },
   hypothecation_details: { label: "Vehicle Hypothecation Details", type: "text" },
@@ -198,18 +198,18 @@ const FIELD_TYPES = {
   prepayment_terms: { label: "Prepayment Terms", type: "text" },
   security_collateral: { label: "Security / Collateral", type: "text" },
 
-  farm_location: { label: "Farm Location", type: "text" },
-  village: { label: "Village", type: "text" },
+  farm_location: { label: "Farm Location", type: "text", required: true },
+  village: { label: "Village", type: "text", required: true },
   taluk: { label: "Taluk", type: "text" },
   district: { label: "District", type: "text" },
-  state: { label: "State", type: "select", options: INDIAN_STATES },
-  land_ownership: { label: "Land Ownership", type: "select", options: ["Owned", "Leased", "Co-owned / Family"] },
-  total_land_area: { label: "Total Land Area / Acreage", type: "text" },
+  state: { label: "State", type: "select", options: INDIAN_STATES, required: true },
+  land_ownership: { label: "Land Ownership", type: "select", options: ["Owned", "Leased", "Co-owned / Family"], required: true },
+  total_land_area: { label: "Total Land Area / Acreage", type: "text", required: true },
   cultivated_area: { label: "Cultivated Area", type: "text" },
   survey_number: { label: "Survey Number", type: "text" },
   land_registration_details: { label: "Land Registration Details", type: "text" },
   lease_details: { label: "Lease Details", type: "text" },
-  crop_type: { label: "Crop Type", type: "text" },
+  crop_type: { label: "Crop Type", type: "text", required: true },
   crop_season: { label: "Crop Season", type: "text" },
   cultivation_area: { label: "Cultivation Area", type: "text" },
   irrigation_type: { label: "Irrigation Type", type: "select", options: ["Rainfed", "Canal", "Borewell", "Drip", "Sprinkler"] },
@@ -455,7 +455,9 @@ const SectionFieldGrid = ({ title, fields, values, onChange }) => (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
       {fields.map((k) => (
         <div key={k} className={fieldWrapClass(k)}>
-          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{FIELD_TYPES[k].label}</label>
+          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
+            {FIELD_TYPES[k].label}{FIELD_TYPES[k].required && <span style={{ color: "#dc2626" }}> *</span>}
+          </label>
           <FieldInput fieldKey={k} value={values[k]} onChange={(v) => onChange(k, v)} siblingValues={values} />
         </div>
       ))}
@@ -814,6 +816,10 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const [generatedParties, setGeneratedParties] = useState([]);
 
   const [requireEsign, setRequireEsign] = useState(true);
+  // Guards against a double-click on Send for eSign/Save Document creating
+  // two orders — set right before awaiting onSubmitOrder, reset in a
+  // finally so it re-enables on failure too (see handleFinalize).
+  const [finalizing, setFinalizing] = useState(false);
 
   // Documents Checklist — hardcoded per loan type on the backend (see
   // app/loan_i18n.py's DOCUMENT_CHECKLISTS, served by
@@ -853,10 +859,21 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
       .finally(() => setChecklistLoading(false));
   }, [document?.doc_name]);
 
-  const presentRoles = new Set(parties.map((p) => p.role));
-  const visibleChecklistItems = checklistItems.filter(
-    (item) => !item.applicant_type?.length || item.applicant_type.some((r) => presentRoles.has(r))
-  );
+  // Grouped per PARTY, not per role — a checklist item whose applicant_type
+  // includes "guarantor" needs its own upload slot for EACH guarantor if
+  // there's more than one (same for Co-Applicants, and even the common
+  // items like PAN Card: the Applicant's PAN and a Co-Applicant's PAN are
+  // two different files). Keyed by `${label}:${item.key}` (label already
+  // disambiguates "Co-Applicant 1" from "Co-Applicant 2") rather than
+  // party array index, so removing an earlier, different-role party
+  // doesn't orphan a later party's already-uploaded files.
+  const partyChecklistGroups = partyRows
+    .map(({ party, label }) => ({
+      label,
+      items: checklistItems.filter((item) => !item.applicant_type?.length || item.applicant_type.includes(party.role)),
+    }))
+    .filter((g) => g.items.length > 0);
+  const checklistItemKey = (partyLabel, itemKey) => `${partyLabel}:${itemKey}`;
   const toggleDocConfirmed = (key) => setConfirmedDocKeys((prev) => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -865,10 +882,13 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
   // Real eKYC identity verification (Aadhaar via DigiLocker, or PAN via
   // SignDesk's General Document Verification) — runs as its own "eKYC"
-  // order (billed separately, same as the standalone eKYC Verification
-  // page) before the loan draft can be generated, and only ever verifies
-  // the Applicant (party index 0) — Co-Applicants/Guarantors are filled in
-  // manually. See ekyc_service.py / digilocker_service.py.
+  // order (billed separately each time, same as the standalone eKYC
+  // Verification page) before the loan draft can be generated. Can target
+  // ANY party (ekycTargetIndex), not just the Applicant — a Co-Applicant
+  // or Guarantor needs their own identity verified just as much, and this
+  // reuses the exact same flow/pricing per party rather than duplicating
+  // it once per PartyCard. See ekyc_service.py / digilocker_service.py.
+  const [ekycTargetIndex, setEkycTargetIndex] = useState(0);
   const [ekycMobile, setEkycMobile] = useState("");
   const [ekycDocType, setEkycDocType] = useState("");
   const [ekycFile, setEkycFile] = useState(null);
@@ -877,6 +897,42 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const [ekycStage, setEkycStage] = useState("idle");
   const [ekycError, setEkycError] = useState("");
   const [ekycFields, setEkycFields] = useState([]);
+
+  // Switching which party this verification is for starts a fresh attempt
+  // — each party's verification is independent (separate order, separate
+  // charge), so carrying over a previous party's in-progress/failed state
+  // would be misleading.
+  const changeEkycTarget = (index) => {
+    setEkycTargetIndex(index);
+    setEkycMobile("");
+    setEkycDocType("");
+    setEkycFile(null);
+    setEkycOrderId(null);
+    setEkycStage("idle");
+    setEkycError("");
+    setEkycFields([]);
+  };
+
+  // removeParty shifts every later party's array index down by one —
+  // if that happens mid-eKYC-flow, ekycTargetIndex could now silently
+  // point at a different party than the one the user was actually
+  // verifying. Any removal resets to the Applicant (always index 0,
+  // never removable) rather than risk writing a verification result onto
+  // the wrong person.
+  const partyCountRef = useRef(parties.length);
+  useEffect(() => {
+    if (parties.length < partyCountRef.current) {
+      setEkycTargetIndex(0);
+      setEkycMobile("");
+      setEkycDocType("");
+      setEkycFile(null);
+      setEkycOrderId(null);
+      setEkycStage("idle");
+      setEkycError("");
+      setEkycFields([]);
+    }
+    partyCountRef.current = parties.length;
+  }, [parties.length]);
 
   const toDateInputValue = (v) => {
     if (!v) return "";
@@ -943,7 +999,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
     const fallbackAddress = hasComponents ? "" : composeEkycAddress(extracted);
 
     setParties((prev) => prev.map((p, i) => {
-      if (i !== 0) return p; // Applicant is always index 0
+      if (i !== ekycTargetIndex) return p;
       return {
         ...p,
         personal: {
@@ -996,8 +1052,8 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
       // The real name comes from the uploaded document after verification
       // (see applyEkycResult). The mobile also isn't required for the ID
       // OCR itself — a placeholder satisfies the order API until the real
-      // number is entered on the Applicant's Present Address below.
-      fd.append("customer_name", parties[0]?.personal?.full_name?.trim() || "Verified Customer");
+      // number is entered on the target party's Present Address below.
+      fd.append("customer_name", parties[ekycTargetIndex]?.personal?.full_name?.trim() || "Verified Customer");
       fd.append("customer_mobile", ekycMobile.trim() || "0000000000");
       fd.append("action", "submit");
       fd.append("document", ekycFile);
@@ -1006,12 +1062,12 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
       const order = await apiUpload("/api/partner-user/orders", fd);
       setEkycOrderId(order.id);
-      // Reuse the verified contact number as the Applicant's own present-
-      // address mobile (used later for the eSign signature invite) rather
-      // than asking for it a second time — only when one was actually
-      // entered here.
+      // Reuse the verified contact number as the target party's own
+      // present-address mobile (used later for the eSign signature invite)
+      // rather than asking for it a second time — only when one was
+      // actually entered here.
       if (ekycMobile.trim()) {
-        setParties((prev) => prev.map((p, i) => (i === 0
+        setParties((prev) => prev.map((p, i) => (i === ekycTargetIndex
           ? { ...p, address: { ...p.address, present: { ...p.address.present, mobile: ekycMobile } } }
           : p)));
       }
@@ -1065,10 +1121,14 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const updateTypeField = (key, value) => setTypeFields((prev) => ({ ...prev, [key]: value }));
 
   // Every field marked `required: true` above (Name/DOB/PAN/Aadhaar, core
-  // Present Address lines, Occupation Type, per party — plus Loan Amount/
-  // Tenure) must be filled before a draft can be generated, mirroring
-  // real bank forms treating these as compulsory. Returns human-readable
-  // "<Role>: <Field>" descriptions of everything still missing.
+  // Present Address lines, Occupation Type, per party; the loan-type
+  // section's own required fields e.g. Vehicle Type/Manufacturer; plus
+  // Loan Amount/Tenure) must be filled before a draft can be generated,
+  // mirroring real bank forms treating these as compulsory. Also
+  // format-checks PAN/Aadhaar/Pincode wherever they're actually filled in
+  // (required or not — a malformed value is never useful). Returns
+  // human-readable "<Role>: <Field>" descriptions of everything still
+  // wrong.
   const getMissingRequiredFields = () => {
     const missing = [];
     if (!formData.loanAmount) missing.push("Loan Amount");
@@ -1082,6 +1142,23 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
       }
       for (const f of PARTY_EMPLOYMENT_FIELDS) {
         if (f.required && !party.employment[f.key]) missing.push(`${label}: ${f.label}`);
+      }
+      const pan = party.personal.pan_number;
+      if (pan && !/^[A-Za-z]{5}[0-9]{4}[A-Za-z]$/.test(pan)) {
+        missing.push(`${label}: PAN Number (must be in the format AAAAA9999A)`);
+      }
+      const aadhaar = party.personal.aadhaar_number;
+      if (aadhaar && !/^\d{12}$/.test(aadhaar)) {
+        missing.push(`${label}: Aadhaar Number (must be exactly 12 digits)`);
+      }
+      const pincode = party.address.present.pincode;
+      if (pincode && !/^\d{6}$/.test(pincode)) {
+        missing.push(`${label}: Present Address – Pincode (must be exactly 6 digits)`);
+      }
+    }
+    for (const s of loanType.sections) {
+      for (const k of s.fields) {
+        if (FIELD_TYPES[k].required && !typeFields[k]) missing.push(`${s.title}: ${FIELD_TYPES[k].label}`);
       }
     }
     return missing;
@@ -1137,7 +1214,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
     }
   };
 
-  const handleFinalize = () => {
+  const handleFinalize = async () => {
     const applicant = generatedParties.find((p) => p.role === "applicant") || parties.find((p) => p.role === "applicant");
     const customerName = applicant?.personal?.full_name || "Customer";
     const customerMobile = applicant?.address?.present?.mobile || "";
@@ -1154,54 +1231,98 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
       setFormError("A valid 10-digit mobile number is required for the Applicant (Present Address > Mobile) to send this for eSign.");
       return;
     }
+    // Every mandatory checklist item must be confirmed (checkbox) or have a
+    // file attached before the order can be finalized — the red "*" next
+    // to a mandatory item was previously decorative only.
+    const missingMandatoryDocs = partyChecklistGroups.flatMap(({ label, items }) =>
+      items
+        .filter((item) => item.is_mandatory && !confirmedDocKeys.has(checklistItemKey(label, item.key)))
+        .map((item) => `${label}: ${item.document_name}`)
+    );
+    if (missingMandatoryDocs.length > 0) {
+      setFormError(["The following mandatory documents must be confirmed or uploaded:", ...missingMandatoryDocs]);
+      return;
+    }
     setFormError(null);
     const file = new File([generatedPdfBytes], `${document.doc_name.replace(/\s+/g, '_')}.pdf`, { type: "application/pdf" });
 
     // One eSign signer per party that entered a valid mobile number —
-    // Co-Applicants/Guarantors without one simply don't get an invite.
-    const signers = generatedParties
-      .filter((p) => isValidMobile(p.address?.present?.mobile))
-      .map((p, i) => ({
-        name: p.personal.full_name || ROLE_LABELS[p.role],
-        mobile: p.address.present.mobile,
-        email: p.address.present.email || null,
-        position: SIGNER_POSITIONS[i % SIGNER_POSITIONS.length],
-      }));
-
-    const documentsChecklist = visibleChecklistItems.map((item) => ({
-      document_name: item.document_name,
-      mandatory: !!item.is_mandatory,
-      confirmed: confirmedDocKeys.has(item.key),
-      uploaded: !!checklistFiles[item.key],
+    // Co-Applicants/Guarantors without one simply don't get an invite
+    // (see the non-blocking warning shown near the eSign toggle in step 2).
+    // SignDesk's `position` only has 4 valid corner values and must be
+    // unique per signer in the same request — with up to 6 possible
+    // parties (1 Applicant + 3 Co-Applicants + 2 Guarantors), the 5th/6th
+    // signer gets no position at all (it's optional) rather than a
+    // colliding duplicate.
+    const signingParties = generatedParties.filter((p) => isValidMobile(p.address?.present?.mobile));
+    const signers = signingParties.map((p, i) => ({
+      name: p.personal.full_name || ROLE_LABELS[p.role],
+      mobile: p.address.present.mobile,
+      email: p.address.present.email || null,
+      position: SIGNER_POSITIONS[i] || undefined,
     }));
+
+    const documentsChecklist = partyChecklistGroups.flatMap(({ label, items }) =>
+      items.map((item) => {
+        const compositeKey = checklistItemKey(label, item.key);
+        return {
+          party: label,
+          document_name: item.document_name,
+          mandatory: !!item.is_mandatory,
+          confirmed: confirmedDocKeys.has(compositeKey),
+          uploaded: !!checklistFiles[compositeKey],
+        };
+      })
+    );
     // Uploaded after the order exists (needs order.id) — see
     // PartnerUserCreateOrder.jsx's onSubmitOrder, POST
-    // /orders/{id}/loan-documents, same two-call pattern eSign uses.
+    // /orders/{id}/loan-documents, same two-call pattern eSign uses. The
+    // backend stores document_key verbatim (no schema change needed for
+    // per-party keys), so the "<Party Label>:<item key>" composite string
+    // doubles as a human-readable record of which party each file is for.
     const checklistFileEntries = Object.entries(checklistFiles).filter(([, f]) => f);
 
-    onSubmitOrder({
-      file,
-      requireEsign,
-      customer_name: customerName,
-      customer_mobile: customerMobile,
-      customer_email: customerEmail,
-      signers,
-      checklistFileEntries,
-      loan_details: {
-        loan_type: document.doc_name,
-        language,
-        verification_method: useEkyc ? "ekyc" : "manual",
-        loan_amount: formData.loanAmount || null,
-        tenure_months: formData.tenure || null,
-        interest_rate: formData.interestRate || "12",
-        repayment_frequency: formData.repaymentFrequency || "Monthly",
-        loan_type_fields: generatedDynamicFields,
-        parties: generatedParties,
-        documents_checklist: documentsChecklist,
-        ...(useEkyc ? { ekyc_order_id: ekycOrderId, ekyc_doc_type: ekycDocType } : {}),
-      },
-    });
+    setFinalizing(true);
+    try {
+      // onSubmitOrder (PartnerUserCreateOrder.jsx) is async and never
+      // rejects (it catches its own errors into its own error state) — we
+      // just need to know when it's done so the button can re-enable
+      // itself, whether that's from success (this component may unmount
+      // once the parent shows its result screen) or failure (component
+      // stays, button must be clickable again).
+      await onSubmitOrder({
+        file,
+        requireEsign,
+        customer_name: customerName,
+        customer_mobile: customerMobile,
+        customer_email: customerEmail,
+        signers,
+        checklistFileEntries,
+        loan_details: {
+          loan_type: document.doc_name,
+          language,
+          verification_method: useEkyc ? "ekyc" : "manual",
+          loan_amount: formData.loanAmount || null,
+          tenure_months: formData.tenure || null,
+          interest_rate: formData.interestRate || "12",
+          repayment_frequency: formData.repaymentFrequency || "Monthly",
+          loan_type_fields: generatedDynamicFields,
+          parties: generatedParties,
+          documents_checklist: documentsChecklist,
+          ...(useEkyc ? { ekyc_order_id: ekycOrderId, ekyc_doc_type: ekycDocType } : {}),
+        },
+      });
+    } finally {
+      setFinalizing(false);
+    }
   };
+
+  // Non-blocking — shown near the eSign toggle so a partner user notices
+  // before finalizing, rather than silently finding out later that a
+  // Co-Applicant/Guarantor never got an eSign invite.
+  const partiesWithoutValidMobile = requireEsign
+    ? partyRows.filter(({ party }) => party.role !== "applicant" && party.personal.full_name && !isValidMobile(party.address.present.mobile))
+    : [];
 
   if (step === 1) {
     return (
@@ -1238,7 +1359,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         </div>
 
         <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
-          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Applicant Identity Verification</label>
+          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Identity Verification</label>
           <div className="flex gap-2 items-center flex-wrap">
             <button type="button" onClick={() => setUseEkyc(false)} className="px-4 py-2 rounded text-sm font-semibold border" style={{ background: !useEkyc ? theme.navy : "#fff", color: !useEkyc ? "#fff" : theme.ink, borderColor: !useEkyc ? theme.navy : theme.border }}>
               Manual Form
@@ -1256,15 +1377,31 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           <div className="space-y-4 pt-4 border-t" style={{ borderColor: theme.border }}>
             <h3 className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.navy }}>Identity Verification</h3>
 
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Verifying identity for</label>
+              <select
+                value={ekycTargetIndex}
+                onChange={(e) => changeEkycTarget(Number(e.target.value))}
+                disabled={ekycStage === "verifying" || ekycStage === "fetching"}
+                className={inputClass}
+                style={baseInputStyle}
+              >
+                {partyRows.map(({ idx, label }) => <option key={idx} value={idx}>{label}</option>)}
+              </select>
+              <p className="text-xs mt-1.5" style={{ color: theme.slate }}>
+                Each party's identity is verified (and billed) separately — switch here to run eKYC for a different Co-Applicant or Guarantor.
+              </p>
+            </div>
+
             {ekycStage === "done" ? (
               <div className="p-3 rounded text-sm bg-green-50 text-green-700 border border-green-200">
-                Identity verified{ekycFields.length > 0 ? " — " + ekycFields.map(f => `${f.label}: ${f.value}`).join(", ") : ""}.
+                {partyRows[ekycTargetIndex]?.label || "Applicant"} identity verified{ekycFields.length > 0 ? " — " + ekycFields.map(f => `${f.label}: ${f.value}`).join(", ") : ""}.
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Applicant Mobile</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{partyRows[ekycTargetIndex]?.label || "Applicant"} Mobile</label>
                     <input type="text" value={ekycMobile} onChange={e => setEkycMobile(e.target.value)} placeholder="Optional" disabled={ekycStage === "verifying" || ekycStage === "fetching"} className={inputClass} style={baseInputStyle} />
                   </div>
                   <div>
@@ -1332,7 +1469,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             </div>
           </div>
           <p className="text-xs mb-3" style={{ color: theme.slate }}>
-            {useEkyc ? "The Applicant's name/DOB/PAN/Aadhaar are filled from eKYC — edit if needed." : "Fill in the Applicant, then add Co-Applicants or Guarantors as needed."} Parties without a valid mobile number won't receive an eSign invite.
+            {useEkyc ? `${partyRows[ekycTargetIndex]?.label || "Applicant"}'s name/DOB/PAN/Aadhaar are filled from eKYC — edit if needed, or switch "Verifying identity for" above to run it for a different party.` : "Fill in the Applicant, then add Co-Applicants or Guarantors as needed."} Parties without a valid mobile number won't receive an eSign invite.
           </p>
           {partyRows.map(({ party, idx, label }) => (
             <PartyCard
@@ -1391,68 +1528,76 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Documents Checklist</h3>
           {checklistLoading ? (
             <p className="text-xs" style={{ color: theme.slate }}>Loading checklist...</p>
-          ) : visibleChecklistItems.length === 0 ? (
+          ) : partyChecklistGroups.length === 0 ? (
             <p className="text-xs" style={{ color: theme.slate }}>No documents required.</p>
           ) : (
-            <div className="space-y-2">
-              {visibleChecklistItems.map((item) => {
-                const file = checklistFiles[item.key];
-                return (
-                  <div key={item.key} className="flex items-start justify-between gap-3 rounded border p-2.5" style={{ borderColor: theme.border }}>
-                    <label className="flex items-start gap-2 text-sm flex-1 min-w-0">
-                      <input type="checkbox" checked={confirmedDocKeys.has(item.key)} onChange={() => toggleDocConfirmed(item.key)} className="mt-0.5 shrink-0" />
-                      <span className="min-w-0">
-                        {item.document_name}
-                        {item.is_mandatory && <span className="text-red-600"> *</span>}
-                        {item.description && <span className="block text-xs" style={{ color: theme.slate }}>{item.description}</span>}
-                        {file && (
-                          <span className="flex items-center gap-1 text-xs mt-1" style={{ color: theme.success }}>
-                            <FileCheck2 size={13} /> <span className="truncate max-w-[200px]">{file.name}</span>
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                    <div className="shrink-0">
-                      {file ? (
-                        <button
-                          type="button"
-                          onClick={() => removeChecklistFile(item.key)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold text-red-600"
-                          style={{ borderColor: theme.border }}
-                        >
-                          <X size={13} /> Remove
-                        </button>
-                      ) : (
-                        <label
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-semibold cursor-pointer whitespace-nowrap"
-                          style={{ borderColor: theme.border, color: theme.navy }}
-                        >
-                          <Upload size={13} /> Upload
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,application/pdf"
-                            className="hidden"
-                            onChange={(e) => { setChecklistFile(item.key, e.target.files?.[0]); e.target.value = ""; }}
-                          />
-                        </label>
-                      )}
-                    </div>
+            <div className="space-y-4">
+              {partyChecklistGroups.map(({ label, items }) => (
+                <div key={label}>
+                  <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>{label}</p>
+                  <div className="space-y-2">
+                    {items.map((item) => {
+                      const compositeKey = checklistItemKey(label, item.key);
+                      const file = checklistFiles[compositeKey];
+                      return (
+                        <div key={compositeKey} className="flex items-start justify-between gap-3 rounded border p-2.5" style={{ borderColor: theme.border }}>
+                          <label className="flex items-start gap-2 text-sm flex-1 min-w-0">
+                            <input type="checkbox" checked={confirmedDocKeys.has(compositeKey)} onChange={() => toggleDocConfirmed(compositeKey)} className="mt-0.5 shrink-0" />
+                            <span className="min-w-0">
+                              {item.document_name}
+                              {item.is_mandatory && <span className="text-red-600"> *</span>}
+                              {item.description && <span className="block text-xs" style={{ color: theme.slate }}>{item.description}</span>}
+                              {file && (
+                                <span className="flex items-center gap-1 text-xs mt-1" style={{ color: theme.success }}>
+                                  <FileCheck2 size={13} /> <span className="truncate max-w-[200px]">{file.name}</span>
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                          <div className="shrink-0">
+                            {file ? (
+                              <button
+                                type="button"
+                                onClick={() => removeChecklistFile(compositeKey)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold text-red-600"
+                                style={{ borderColor: theme.border }}
+                              >
+                                <X size={13} /> Remove
+                              </button>
+                            ) : (
+                              <label
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-semibold cursor-pointer whitespace-nowrap"
+                                style={{ borderColor: theme.border, color: theme.navy }}
+                              >
+                                <Upload size={13} /> Upload
+                                <input
+                                  type="file"
+                                  accept="image/jpeg,image/png,application/pdf"
+                                  className="hidden"
+                                  onChange={(e) => { setChecklistFile(compositeKey, e.target.files?.[0]); e.target.value = ""; }}
+                                />
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        {useEkyc && ekycStage !== "done" && (
-          <p className="text-xs" style={{ color: theme.slate }}>Complete Applicant identity verification above before generating the draft.</p>
+        {useEkyc && ekycStage === "verifying" && (
+          <p className="text-xs" style={{ color: theme.slate }}>Verifying — this only blocks submission while actively in progress; eKYC is optional and per-party, not a hard prerequisite for every party.</p>
         )}
 
         <ErrorBanner message={formError} />
 
         <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
           <button onClick={onCancel} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Cancel</button>
-          <button disabled={generating || (useEkyc && ekycStage !== "done")} onClick={handleGenerateDraft} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
+          <button disabled={generating || ekycStage === "verifying"} onClick={handleGenerateDraft} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
             {generating ? "Generating..." : "Generate Draft"}
           </button>
         </div>
@@ -1468,7 +1613,17 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         </h2>
 
         {pdfPreviewUrl ? (
-          <iframe title="Generated loan document" src={pdfPreviewUrl} className="w-full rounded border" style={{ height: '480px', borderColor: theme.border }} />
+          <>
+            <iframe title="Generated loan document" src={pdfPreviewUrl} className="w-full rounded border" style={{ height: '480px', borderColor: theme.border }} />
+            <a
+              href={pdfPreviewUrl}
+              download={`${document.doc_name.replace(/\s+/g, '_')}_draft.pdf`}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold"
+              style={{ color: theme.navy }}
+            >
+              <Download size={13} /> Download PDF
+            </a>
+          </>
         ) : (
           <div className="p-4 rounded border text-sm text-center" style={{ background: "#f8fafc", borderColor: theme.border, minHeight: '200px' }}>
             Preview unavailable.
@@ -1490,14 +1645,19 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
               eSign invites will be sent to the Applicant and every Co-Applicant/Guarantor who has a valid mobile number entered.
             </p>
           )}
+          {partiesWithoutValidMobile.length > 0 && (
+            <p className="text-xs mt-1.5 px-2.5 py-1.5 rounded" style={{ color: "#A16207", background: "#FBF3E1" }}>
+              Won't get an eSign invite (no valid mobile number entered): {partiesWithoutValidMobile.map((p) => p.label).join(", ")}.
+            </p>
+          )}
         </div>
 
         <ErrorBanner message={formError} />
 
         <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
-          <button onClick={() => { setFormError(null); setStep(1); }} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Back</button>
-          <button onClick={handleFinalize} className="px-5 py-2.5 rounded text-sm font-semibold text-white" style={{ background: theme.navy }}>
-            {requireEsign ? "Send for eSign" : "Save Document"}
+          <button disabled={finalizing} onClick={() => { setFormError(null); setStep(1); }} className="px-5 py-2.5 rounded text-sm font-semibold border disabled:opacity-60" style={{ background: "#fff", borderColor: theme.border }}>Back</button>
+          <button disabled={finalizing} onClick={handleFinalize} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
+            {finalizing ? "Submitting..." : requireEsign ? "Send for eSign" : "Save Document"}
           </button>
         </div>
       </div>

@@ -791,7 +791,28 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
     const dob = toDateInputValue(extractEkycValue(extracted, ["date_of_birth", "dob"]));
     const aadhaar = extractEkycValue(extracted, ["aadhaar_number", "uid"]);
     const pan = extractEkycValue(extracted, ["pan_number", "pan"]);
-    const address = composeEkycAddress(extracted);
+    // DigiLocker's Aadhaar data (and occasionally PAN extraction) gives
+    // address components separately rather than one flat string — pull
+    // each into its matching Present Address field instead of dumping
+    // everything into "street" (that predates State/District becoming
+    // real dropdowns). State/District are matched against the same
+    // option lists the dropdowns themselves use (see matchFromList /
+    // lookupPincode) so they land on an actual selectable value, never an
+    // unselectable raw string the <select> can't display. Falls back to
+    // the old flat-string-into-street behavior only when no individual
+    // component was present at all (composeEkycAddress's "address"/
+    // "full_address" case).
+    const houseNo = extractEkycValue(extracted, ["house"]);
+    const street = extractEkycValue(extracted, ["street"]);
+    const city = extractEkycValue(extracted, ["vtc"]);
+    const rawDistrict = extractEkycValue(extracted, ["district"]);
+    const rawState = extractEkycValue(extracted, ["state"]);
+    const pincode = extractEkycValue(extracted, ["pincode", "pin_code"]);
+    const matchedState = matchFromList(INDIAN_STATES, rawState);
+    const matchedDistrict = matchedState ? matchFromList(STATE_DISTRICTS[matchedState] || [], rawDistrict) : "";
+    const hasComponents = houseNo || street || city || rawDistrict || rawState || pincode;
+    const fallbackAddress = hasComponents ? "" : composeEkycAddress(extracted);
+
     setParties((prev) => prev.map((p, i) => {
       if (i !== 0) return p; // Applicant is always index 0
       return {
@@ -803,7 +824,19 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           ...(aadhaar ? { aadhaar_number: aadhaar } : {}),
           ...(pan ? { pan_number: pan } : {}),
         },
-        address: address ? { ...p.address, present: { ...p.address.present, street: address } } : p.address,
+        address: {
+          ...p.address,
+          present: {
+            ...p.address.present,
+            ...(houseNo ? { house_no: houseNo } : {}),
+            ...(street ? { street } : {}),
+            ...(city ? { city } : {}),
+            ...(matchedDistrict ? { district: matchedDistrict } : {}),
+            ...(matchedState ? { state: matchedState } : {}),
+            ...(pincode ? { pincode } : {}),
+            ...(fallbackAddress ? { street: fallbackAddress } : {}),
+          },
+        },
       };
     }));
     return name;

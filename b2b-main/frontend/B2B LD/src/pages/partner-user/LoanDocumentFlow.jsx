@@ -1677,10 +1677,10 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Finalization</label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setRequireEsign(true)} className="px-4 py-2 rounded text-sm font-semibold border" style={{ background: requireEsign ? theme.navy : "#fff", color: requireEsign ? "#fff" : theme.ink, borderColor: requireEsign ? theme.navy : theme.border }}>
-              Verify with eSign{document?.esign_price ? ` (₹${document.esign_price}/signer)` : ""}
+              Require eSign{document?.esign_price ? ` (₹${document.esign_price}/signer)` : ""}
             </button>
             <button type="button" onClick={() => setRequireEsign(false)} className="px-4 py-2 rounded text-sm font-semibold border" style={{ background: !requireEsign ? theme.navy : "#fff", color: !requireEsign ? "#fff" : theme.ink, borderColor: !requireEsign ? theme.navy : theme.border }}>
-              Without Sign
+              Skip eSign
             </button>
           </div>
           {requireEsign && (
@@ -1700,7 +1700,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
           <button disabled={finalizing} onClick={() => { setFormError(null); setStep(1); }} className="px-5 py-2.5 rounded text-sm font-semibold border disabled:opacity-60" style={{ background: "#fff", borderColor: theme.border }}>Back</button>
           <button disabled={finalizing} onClick={handleFinalize} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
-            {finalizing ? "Submitting..." : requireEsign ? "Send for eSign" : "Save Document"}
+            {finalizing ? "Submitting..." : requireEsign ? "Submit & Send for eSign" : "Save Document"}
           </button>
         </div>
       </div>

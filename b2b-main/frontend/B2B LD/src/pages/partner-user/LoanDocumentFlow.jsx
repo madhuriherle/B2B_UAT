@@ -1354,42 +1354,23 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
   if (step === 1) {
     return (
-      <div className="space-y-4">
-        <h2 className="text-sm font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy, fontFamily: serif }}>
-          {document.doc_name} Application
-        </h2>
-
-        <div className="sticky top-0 z-10 flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 py-3 border-b mb-4" style={{ background: theme.card, borderColor: theme.border }}>
-          {[
-            { label: "Loan Details", ref: loanDetailsSectionRef },
-            { label: "Parties & KYC", ref: applicantsSectionRef },
-            { label: "Documents", ref: documentsSectionRef },
-          ].map((s, idx) => (
-            <React.Fragment key={s.label}>
-              <button
-                type="button"
-                onClick={() => scrollToSection(s.ref)}
-                className="flex items-center gap-2 sm:gap-3 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl transition font-medium text-xs sm:text-sm whitespace-nowrap border"
-                style={{ background: "#fff", borderColor: theme.border, color: theme.ink }}
-                onMouseOver={(e) => { e.currentTarget.style.borderColor = theme.navy; e.currentTarget.style.background = theme.bg; }}
-                onMouseOut={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.background = "#fff"; }}
-              >
-                <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white" style={{ background: theme.navy }}>
-                  {idx + 1}
-                </span>
-                <span className="font-bold">{s.label}</span>
-              </button>
-              {idx < 2 && (
-                <div className="flex items-center justify-center">
-                  <span className="text-slate-300 text-xs shrink-0 font-bold px-1">&gt;</span>
-                </div>
-              )}
-            </React.Fragment>
-          ))}
+      <div className="space-y-8 max-w-4xl mx-auto py-2">
+        <div className="mb-2">
+          <h1 className="text-2xl font-bold text-slate-800" style={{ fontFamily: serif }}>
+            {document.doc_name} Application
+          </h1>
+          <p className="text-slate-500 mt-1 text-sm">Please complete the steps below to submit your application.</p>
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Language</label>
+        {/* Card 1: Loan Details & Settings */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" ref={loanDetailsSectionRef}>
+          <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">1</div>
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Loan Details & Settings</h2>
+          </div>
+          <div className="p-6 space-y-6">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Language</label>
           <select value={language} onChange={e => setLanguage(e.target.value)} className={inputClass} style={baseInputStyle}>
             {document.available_languages?.map(lang => (
               <option key={lang} value={lang}>{lang}</option>
@@ -1482,10 +1463,20 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             )}
           </div>
         )}
+          </div>
+        </div>
 
-        <div ref={applicantsSectionRef} className="pt-4 border-t scroll-mt-16" style={{ borderColor: theme.border }}>
-          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h3 className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.navy }}>Applicant Management</h3>
+        {/* Card 2: Parties & KYC */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" ref={applicantsSectionRef}>
+          <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">2</div>
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Parties & KYC</h2>
+          </div>
+          <div className="p-6">
+            <p className="text-sm text-slate-500 mb-6">
+              {useEkyc ? `${partyRows[ekycTargetIndex]?.label || "Applicant"}'s name/DOB/PAN/Aadhaar are filled from eKYC – edit if needed, or switch "Verifying identity for" above to run it for a different party.` : "Fill in the Applicant, then add Co-Applicants or Guarantors as needed."} Parties without a valid mobile number won't receive an eSign invite.
+            </p>
+            <div className="flex items-center justify-end mb-4 flex-wrap gap-3">
             <div className="flex gap-2">
               <button
                 type="button"
@@ -1507,9 +1498,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
               </button>
             </div>
           </div>
-          <p className="text-xs mb-3" style={{ color: theme.slate }}>
-            {useEkyc ? `${partyRows[ekycTargetIndex]?.label || "Applicant"}'s name/DOB/PAN/Aadhaar are filled from eKYC — edit if needed, or switch "Verifying identity for" above to run it for a different party.` : "Fill in the Applicant, then add Co-Applicants or Guarantors as needed."} Parties without a valid mobile number won't receive an eSign invite.
-          </p>
+          
           {partyRows.map(({ party, idx, label }) => (
             <PartyCard
               key={idx}
@@ -1521,9 +1510,15 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             />
           ))}
         </div>
+        </div>
 
-        <div ref={loanDetailsSectionRef} className="scroll-mt-16">
-          <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Loan Details</h3>
+        {/* Card 3: Loan Details */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" ref={loanDetailsSectionRef}>
+          <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">3</div>
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Loan Details</h2>
+          </div>
+          <div className="p-6 space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Loan Amount<span style={{ color: "#dc2626" }}> *</span></label>
@@ -1544,7 +1539,6 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
               </select>
             </div>
           </div>
-        </div>
 
         {loanType.sections.map((s) => (
           <SectionFieldGrid
@@ -1562,9 +1556,16 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           values={typeFields}
           onChange={updateTypeField}
         />
+          </div>
+        </div>
 
-        <div ref={documentsSectionRef} className="pt-4 border-t scroll-mt-16" style={{ borderColor: theme.border }}>
-          <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Documents Checklist</h3>
+        {/* Card 4: Required Documents */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" ref={documentsSectionRef}>
+          <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">4</div>
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Required Documents</h2>
+          </div>
+          <div className="p-6">
           {checklistLoading ? (
             <p className="text-xs" style={{ color: theme.slate }}>Loading checklist...</p>
           ) : partyChecklistGroups.length === 0 ? (
@@ -1620,8 +1621,9 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                   </div>
                 </div>
               ))}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
         {useEkyc && ekycStage === "verifying" && (

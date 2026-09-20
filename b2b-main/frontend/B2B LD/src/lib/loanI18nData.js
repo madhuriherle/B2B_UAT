@@ -1107,7 +1107,10 @@ export const UI_TRANSLATIONS = {
     "saving": "Saving...",
     "save_progress": "Save Progress",
     "generating": "Generating...",
-    "guarantor's_pan_card": "Guarantor's PAN Card"
+    "guarantor's_pan_card": "Guarantor's PAN Card",
+    "save & exit": "Save & Exit",
+    "save & continue": "Save & Continue",
+    "do you want to save and exit, or save and continue working?": "Do you want to save and exit, or save and continue working?"
   },
   "Hindi": {
     "date_of_birth": "जन्म तारीख",
@@ -2217,7 +2220,10 @@ export const UI_TRANSLATIONS = {
     "saving": "सहेज रहा है...",
     "save_progress": "प्रगति सहेजें",
     "generating": "उत्पन्न कर रहा है...",
-    "guarantor's_pan_card": "गारंटर का पैन कार्ड"
+    "guarantor's_pan_card": "गारंटर का पैन कार्ड",
+    "save & exit": "सहेजें और बाहर निकलें",
+    "save & continue": "सहेजें और जारी रखें",
+    "do you want to save and exit, or save and continue working?": "क्या आप सहेज कर बाहर निकलना चाहते हैं, या सहेज कर काम जारी रखना चाहते हैं?"
   },
   "Kannada": {
     "date_of_birth": "ಹುಟ್ಟಿದ ದಿನಾಂಕ",
@@ -3327,7 +3333,10 @@ export const UI_TRANSLATIONS = {
     "saving": "ಉಳಿಸಲಾಗುತ್ತಿದೆ...",
     "save_progress": "ಪ್ರಗತಿ ಉಳಿಸಿ",
     "generating": "ರಚಿಸಲಾಗುತ್ತಿದೆ...",
-    "guarantor's_pan_card": "ಗ್ಯಾರಂಟರ್‌ನ ಪ್ಯಾನ್ ಕಾರ್ಡ್"
+    "guarantor's_pan_card": "ಗ್ಯಾರಂಟರ್‌ನ ಪ್ಯಾನ್ ಕಾರ್ಡ್",
+    "save & exit": "ಉಳಿಸಿ ಮತ್ತು ನಿರ್ಗಮಿಸಿ",
+    "save & continue": "ಉಳಿಸಿ ಮತ್ತು ಮುಂದುವರಿಸಿ",
+    "do you want to save and exit, or save and continue working?": "ನೀವು ಉಳಿಸಿ ನಿರ್ಗಮಿಸಲು ಬಯಸುವಿರಾ, ಅಥವಾ ಉಳಿಸಿ ಕೆಲಸ ಮುಂದುವರಿಸಲು ಬಯಸುವಿರಾ?"
   },
   "Marathi": {
     "date_of_birth": "जन्मतारीख",
@@ -4437,6 +4446,9 @@ export const UI_TRANSLATIONS = {
     "saving": "जतन करत आहे...",
     "save_progress": "प्रगती जतन करा",
     "generating": "तयार करत आहे...",
-    "guarantor's_pan_card": "जामीनदाराचे पॅन कार्ड"
+    "guarantor's_pan_card": "जामीनदाराचे पॅन कार्ड",
+    "save & exit": "जतन करा आणि बाहेर पडा",
+    "save & continue": "जतन करा आणि पुढे जा",
+    "do you want to save and exit, or save and continue working?": "आपण जतन करून बाहेर पडू इच्छिता की जतन करून काम चालू ठेवू इच्छिता?"
   }
 };

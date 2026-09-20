@@ -600,6 +600,40 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
           </button>
         </>
       )}
+
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-bold mb-2" style={{ color: theme.ink }}>{t("Save Progress")}</h3>
+            <p className="text-sm mb-6" style={{ color: theme.slate }}>
+              {t("Do you want to save and exit, or save and continue working?")}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => { setShowSaveModal(false); handleSaveDraft(false); }} 
+                className="w-full py-2.5 rounded font-semibold text-white transition-colors"
+                style={{ background: theme.navy }}
+              >
+                {t("Save & Continue")}
+              </button>
+              <button 
+                onClick={() => { setShowSaveModal(false); handleSaveDraft(true); }} 
+                className="w-full py-2.5 rounded font-semibold border transition-colors"
+                style={{ borderColor: theme.navy, color: theme.navy }}
+              >
+                {t("Save & Exit")}
+              </button>
+              <button 
+                onClick={() => setShowSaveModal(false)} 
+                className="w-full py-2 rounded text-sm font-medium mt-1"
+                style={{ color: theme.slate }}
+              >
+                {t("Cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -732,6 +766,40 @@ const ErrorBanner = ({ message }) => {
       ) : (
         <p>{message}</p>
       )}
+
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-bold mb-2" style={{ color: theme.ink }}>{t("Save Progress")}</h3>
+            <p className="text-sm mb-6" style={{ color: theme.slate }}>
+              {t("Do you want to save and exit, or save and continue working?")}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => { setShowSaveModal(false); handleSaveDraft(false); }} 
+                className="w-full py-2.5 rounded font-semibold text-white transition-colors"
+                style={{ background: theme.navy }}
+              >
+                {t("Save & Continue")}
+              </button>
+              <button 
+                onClick={() => { setShowSaveModal(false); handleSaveDraft(true); }} 
+                className="w-full py-2.5 rounded font-semibold border transition-colors"
+                style={{ borderColor: theme.navy, color: theme.navy }}
+              >
+                {t("Save & Exit")}
+              </button>
+              <button 
+                onClick={() => setShowSaveModal(false)} 
+                className="w-full py-2 rounded text-sm font-medium mt-1"
+                style={{ color: theme.slate }}
+              >
+                {t("Cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -758,6 +826,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const [useEkyc, setUseEkyc] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
   // Validation/error messages surface as an inline banner (see ErrorBanner
   // below), matching PartnerUserCreateOrder.jsx's own error-display
@@ -787,7 +856,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
     }
   }, [initialDraftData, draftLoaded]);
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async (exitAfterSave = false) => {
     setSavingDraft(true);
     setFormError(null);
     try {
@@ -816,6 +885,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         }
       }
       setFormError("Draft saved successfully.");
+      if (exitAfterSave) setTimeout(() => onCancel(), 600);
     } catch (err) {
       setFormError(err.message || "Failed to save draft.");
     } finally {
@@ -1682,7 +1752,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           
           <button 
             disabled={generating || ekycStage === "verifying" || savingDraft} 
-            onClick={handleSaveDraft} 
+            onClick={() => setShowSaveModal(true)} 
             className="px-5 py-2.5 rounded text-sm font-semibold border disabled:opacity-60" 
             style={{ background: "#fff", borderColor: theme.navy, color: theme.navy }}
           >

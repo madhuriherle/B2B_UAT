@@ -1816,7 +1816,7 @@ const PartnerUserCreateOrder = () => {
         </p>
       </div>
 
-      <div className={"rounded-lg p-6 " + (isLoanFlowView ? "w-full max-w-none" : "max-w-2xl")} style={{ background: theme.card, border: `1px solid ${theme.border}`, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
+      <div className={"rounded-lg p-6 " + (isLoanFlowView || (isDocumentService && !selectedDocument) ? "w-full max-w-none" : "max-w-2xl")} style={{ background: theme.card, border: `1px solid ${theme.border}`, boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}>
         {error && <p className="text-xs font-medium mb-4 px-3 py-2 rounded" style={{ background: theme.goldSoft, color: theme.navy, border: `1px solid ${theme.gold}66` }}>{error}</p>}
 
         {!servicesLoading && services.length === 0 && (
@@ -1830,15 +1830,20 @@ const PartnerUserCreateOrder = () => {
             "{form.service_name}" isn't set up for ordering yet — contact support to get it configured before placing an order for it.
           </p>
         ) : isDocumentService && !selectedDocument ? (
-          <>
-            <SectionLabel>Select a Document</SectionLabel>
-            <p className="text-xs mb-4" style={{ color: theme.slate }}>Choose the document you want to create an order for.</p>
+          <div className="max-w-5xl mx-auto py-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: theme.indigoSoft }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={theme.indigo} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              </div>
+              <h2 className="text-xl font-bold" style={{ color: theme.ink }}>Select a Document</h2>
+            </div>
+            <p className="text-sm mb-8 ml-13" style={{ color: theme.slate }}>Choose the document template you want to use for this order.</p>
             {documents.length === 0 ? (
-              <p className="text-xs font-medium px-3 py-2 rounded" style={{ background: theme.dangerSoft, color: theme.danger, border: `1px solid ${theme.danger}33` }}>
+              <p className="text-sm font-medium px-4 py-3 rounded" style={{ background: theme.dangerSoft, color: theme.danger, border: `1px solid ${theme.danger}33` }}>
                 No documents have been configured for you yet. Contact your Partner admin.
               </p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
                 {documents.map((d) => {
                   const externalType = externalDocumentType(d.doc_name);
                   return (
@@ -1852,18 +1857,34 @@ const PartnerUserCreateOrder = () => {
                           setSelectedDocument(d);
                         }
                       }}
-                      className="text-left p-4 rounded-lg transition-all hover:shadow-md"
+                      className="group flex flex-col text-left p-5 rounded-xl transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative overflow-hidden"
                       style={{ background: theme.bg, border: `1px solid ${theme.border}` }}
                     >
-                      <p className="text-sm font-semibold mb-1" style={{ color: theme.ink }}>{d.doc_name}</p>
-                      {d.state_name && <p className="text-xs mb-2" style={{ color: theme.slate }}>{d.state_name}</p>}
-                      <p className="text-sm font-semibold" style={{ color: theme.navy }}>{d.base_price != null ? formatCurrency(d.base_price) : "-"}</p>
+                      <div className="absolute top-0 right-0 w-16 h-16 opacity-5 transition-transform duration-300 group-hover:scale-125 group-hover:opacity-10" style={{ background: `radial-gradient(circle at top right, ${theme.indigo}, transparent)` }}></div>
+                      
+                      <p className="text-base font-bold mb-1.5 leading-tight pr-4" style={{ color: theme.ink }}>{d.doc_name}</p>
+                      
+                      <div className="flex-1"></div>
+                      
+                      {d.state_name && (
+                        <div className="inline-flex items-center gap-1 mt-3 mb-2 px-2 py-0.5 rounded text-[11px] font-medium" style={{ background: theme.slate + '1A', color: theme.slate }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                          {d.state_name}
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between mt-auto pt-3 border-t w-full" style={{ borderColor: theme.border + '80' }}>
+                        <p className="text-sm font-bold tracking-tight" style={{ color: theme.navy }}>{d.base_price != null ? formatCurrency(d.base_price) : "-"}</p>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.indigo} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </span>
+                      </div>
                     </button>
                   );
                 })}
               </div>
             )}
-          </>
+          </div>
         ) : (isDocumentService && selectedDocument && (selectedDocument.category_name === 'Loan Documents' || selectedDocument.doc_name.toLowerCase().includes('loan'))) || (form.service_name && form.service_name.toLowerCase().includes('loan')) ? (
           <LoanDocumentFlow
             document={selectedDocument || { doc_name: form.service_name, config_id: null, doc_id: null, available_languages: ["English", "Hindi", "Kannada", "Marathi"] }}

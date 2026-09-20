@@ -476,8 +476,8 @@ const FieldInput = ({ fieldKey, value, onChange, siblingValues }) => {
 };
 
 const SectionFieldGrid = ({ title, fields, values, onChange }) => (
-  <div className="pt-3 mt-3 border-t" style={{ borderColor: theme.border }}>
-    <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>{title}</h3>
+  <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
+      <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>{title}</h3>
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
       {fields.map((k) => (
         <div key={k} className={fieldWrapClass(k)}>
@@ -1510,7 +1510,9 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">3</div>
             <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Loan Details</h2>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-6" style={{ background: "#F8FAFC" }}>
+            <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
+              <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Base Configuration</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Loan Amount<span style={{ color: "#dc2626" }}> *</span></label>
@@ -1529,8 +1531,9 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
               <select value={formData.repaymentFrequency} onChange={e => setField("repaymentFrequency", e.target.value)} className={inputClass} style={baseInputStyle}>
                 {REPAYMENT_FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
+              </div>
             </div>
-          </div>
+            </div>
 
         {loanType.sections.map((s) => (
           <SectionFieldGrid

@@ -1830,14 +1830,9 @@ const PartnerUserCreateOrder = () => {
             "{form.service_name}" isn't set up for ordering yet — contact support to get it configured before placing an order for it.
           </p>
         ) : isDocumentService && !selectedDocument ? (
-          <div className="max-w-5xl mx-auto py-4">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: theme.indigoSoft }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={theme.indigo} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-              </div>
-              <h2 className="text-xl font-bold" style={{ color: theme.ink }}>Select a Document</h2>
-            </div>
-            <p className="text-sm mb-8 ml-13" style={{ color: theme.slate }}>Choose the document template you want to use for this order.</p>
+          <div className="py-2">
+            <SectionLabel>Select a Document</SectionLabel>
+            <p className="text-sm mb-6" style={{ color: theme.slate }}>Choose the document template you want to use for this order.</p>
             {documents.length === 0 ? (
               <p className="text-sm font-medium px-4 py-3 rounded" style={{ background: theme.dangerSoft, color: theme.danger, border: `1px solid ${theme.danger}33` }}>
                 No documents have been configured for you yet. Contact your Partner admin.

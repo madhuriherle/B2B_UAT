@@ -600,40 +600,6 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
           </button>
         </>
       )}
-
-      {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-lg font-bold mb-2" style={{ color: theme.ink }}>{t("Save Progress")}</h3>
-            <p className="text-sm mb-6" style={{ color: theme.slate }}>
-              {t("Do you want to save and exit, or save and continue working?")}
-            </p>
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => { setShowSaveModal(false); handleSaveDraft(false); }} 
-                className="w-full py-2.5 rounded font-semibold text-white transition-colors"
-                style={{ background: theme.navy }}
-              >
-                {t("Save & Continue")}
-              </button>
-              <button 
-                onClick={() => { setShowSaveModal(false); handleSaveDraft(true); }} 
-                className="w-full py-2.5 rounded font-semibold border transition-colors"
-                style={{ borderColor: theme.navy, color: theme.navy }}
-              >
-                {t("Save & Exit")}
-              </button>
-              <button 
-                onClick={() => setShowSaveModal(false)} 
-                className="w-full py-2 rounded text-sm font-medium mt-1"
-                style={{ color: theme.slate }}
-              >
-                {t("Cancel")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -765,40 +731,6 @@ const ErrorBanner = ({ message }) => {
         </>
       ) : (
         <p>{message}</p>
-      )}
-
-      {showSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
-            <h3 className="text-lg font-bold mb-2" style={{ color: theme.ink }}>{t("Save Progress")}</h3>
-            <p className="text-sm mb-6" style={{ color: theme.slate }}>
-              {t("Do you want to save and exit, or save and continue working?")}
-            </p>
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => { setShowSaveModal(false); handleSaveDraft(false); }} 
-                className="w-full py-2.5 rounded font-semibold text-white transition-colors"
-                style={{ background: theme.navy }}
-              >
-                {t("Save & Continue")}
-              </button>
-              <button 
-                onClick={() => { setShowSaveModal(false); handleSaveDraft(true); }} 
-                className="w-full py-2.5 rounded font-semibold border transition-colors"
-                style={{ borderColor: theme.navy, color: theme.navy }}
-              >
-                {t("Save & Exit")}
-              </button>
-              <button 
-                onClick={() => setShowSaveModal(false)} 
-                className="w-full py-2 rounded text-sm font-medium mt-1"
-                style={{ color: theme.slate }}
-              >
-                {t("Cancel")}
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
@@ -1763,6 +1695,40 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             {generating ? t("Generating...") : t("Generate Document")}
           </button>
         </div>
+
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-bold mb-2" style={{ color: theme.ink }}>{t("Save Progress")}</h3>
+            <p className="text-sm mb-6" style={{ color: theme.slate }}>
+              {t("Do you want to save and exit, or save and continue working?")}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => { setShowSaveModal(false); handleSaveDraft(false); }} 
+                className="w-full py-2.5 rounded font-semibold text-white transition-colors"
+                style={{ background: theme.navy }}
+              >
+                {t("Save & Continue")}
+              </button>
+              <button 
+                onClick={() => { setShowSaveModal(false); handleSaveDraft(true); }} 
+                className="w-full py-2.5 rounded font-semibold border transition-colors"
+                style={{ borderColor: theme.navy, color: theme.navy }}
+              >
+                {t("Save & Exit")}
+              </button>
+              <button 
+                onClick={() => setShowSaveModal(false)} 
+                className="w-full py-2 rounded text-sm font-medium mt-1"
+                style={{ color: theme.slate }}
+              >
+                {t("Cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     );
   }
@@ -2024,6 +1990,40 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             {finalizing ? "Submitting..." : requireEsign ? "Submit & Send for eSign" : "Save Document"}
           </button>
         </div>
+
+      {showSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 animate-in fade-in zoom-in duration-200">
+            <h3 className="text-lg font-bold mb-2" style={{ color: theme.ink }}>{t("Save Progress")}</h3>
+            <p className="text-sm mb-6" style={{ color: theme.slate }}>
+              {t("Do you want to save and exit, or save and continue working?")}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={() => { setShowSaveModal(false); handleSaveDraft(false); }} 
+                className="w-full py-2.5 rounded font-semibold text-white transition-colors"
+                style={{ background: theme.navy }}
+              >
+                {t("Save & Continue")}
+              </button>
+              <button 
+                onClick={() => { setShowSaveModal(false); handleSaveDraft(true); }} 
+                className="w-full py-2.5 rounded font-semibold border transition-colors"
+                style={{ borderColor: theme.navy, color: theme.navy }}
+              >
+                {t("Save & Exit")}
+              </button>
+              <button 
+                onClick={() => setShowSaveModal(false)} 
+                className="w-full py-2 rounded text-sm font-medium mt-1"
+                style={{ color: theme.slate }}
+              >
+                {t("Cancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     );
   }

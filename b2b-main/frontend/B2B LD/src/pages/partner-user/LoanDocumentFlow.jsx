@@ -569,8 +569,8 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
   const updateRow = (i, key, value) => onChange(rows.map((r, idx) => (idx === i ? { ...r, [key]: value } : r)));
 
   return (
-    <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
-      <SectionHeading title={title} />
+    <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
+        <SectionHeading title={title} />
       {rows.length === 0 ? (
         <button
           type="button"
@@ -693,13 +693,13 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
           )}
         </span>
       </summary>
-      <div className="p-4 space-y-4">
-        <div>
+      <div className="p-4 space-y-4" style={{ background: "#F8FAFC" }}>
+        <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
           <SectionHeading title="Personal / KYC" />
           <FieldGrid fields={PARTY_PERSONAL_FIELDS} values={party.personal} onChange={updatePersonal} />
         </div>
 
-        <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
+        <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
           <SectionHeading title="Address" />
           <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Present Address</p>
           <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} />
@@ -727,7 +727,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
           )}
         </div>
 
-        <div className="pt-3 border-t" style={{ borderColor: theme.border }}>
+        <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
           <SectionHeading title="Employment / Business" />
           <FieldGrid fields={PARTY_EMPLOYMENT_FIELDS} values={party.employment} onChange={updateEmployment} />
         </div>

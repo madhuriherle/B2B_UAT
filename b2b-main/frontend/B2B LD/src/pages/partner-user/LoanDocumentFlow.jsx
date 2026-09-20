@@ -1354,7 +1354,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
   if (step === 1) {
     return (
-      <div className="space-y-8 max-w-4xl mx-auto py-2">
+      <div className="space-y-8 w-full py-2">
         <div className="mb-2">
           <h1 className="text-2xl font-bold text-slate-800" style={{ fontFamily: serif }}>
             {document.doc_name} Application

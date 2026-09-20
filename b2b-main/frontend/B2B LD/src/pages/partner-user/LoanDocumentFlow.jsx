@@ -862,8 +862,6 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   // Loan-type-specific dynamic fields, keyed by the backend's dynamic_fields
   // Type-specific extra fields (e.g., Vehicle details for Bike/Car Loan)
   const [typeFields, setTypeFields] = useState({});
-  const [language, setLanguage] = useState("English");
-  window.currentLoanLanguage = language;
   // Snapshot of exactly what was sent when the draft was generated —
   // persisted with the order, not the live form state.
   const [generatedDynamicFields, setGeneratedDynamicFields] = useState({});
@@ -1686,11 +1684,11 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             className="px-5 py-2.5 rounded text-sm font-semibold border disabled:opacity-60" 
             style={{ background: "#fff", borderColor: theme.navy, color: theme.navy }}
           >
-            {savingDraft ? "Saving..." : "Save as Draft"}
+            {savingDraft ? t("Saving...") : t("Save Progress")}
           </button>
           
           <button disabled={generating || ekycStage === "verifying" || savingDraft} onClick={handleGenerateDraft} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
-            {generating ? "Generating..." : "Generate Draft"}
+            {generating ? t("Generating...") : t("Generate Document")}
           </button>
         </div>
       </div>

@@ -1103,7 +1103,11 @@ export const UI_TRANSLATIONS = {
     "tamulpur": "Tamulpur",
     "tiruvannamalai": "Tiruvannamalai",
     "bengaluru south": "Bengaluru South",
-    "kupwara": "Kupwara"
+    "kupwara": "Kupwara",
+    "saving": "Saving...",
+    "save_progress": "Save Progress",
+    "generating": "Generating...",
+    "guarantor's_pan_card": "Guarantor's PAN Card"
   },
   "Hindi": {
     "date_of_birth": "जन्म तारीख",
@@ -2209,7 +2213,11 @@ export const UI_TRANSLATIONS = {
     "tamulpur": "तामुलपुर",
     "tiruvannamalai": "तिरुवन्नामलाई",
     "bengaluru south": "बेंगलुरू दक्षिण",
-    "kupwara": "कुपवाड़ा"
+    "kupwara": "कुपवाड़ा",
+    "saving": "सहेज रहा है...",
+    "save_progress": "प्रगति सहेजें",
+    "generating": "उत्पन्न कर रहा है...",
+    "guarantor's_pan_card": "गारंटर का पैन कार्ड"
   },
   "Kannada": {
     "date_of_birth": "ಹುಟ್ಟಿದ ದಿನಾಂಕ",
@@ -3315,7 +3323,11 @@ export const UI_TRANSLATIONS = {
     "tamulpur": "Tamulpur",
     "tiruvannamalai": "Tiruvannamalai",
     "bengaluru south": "Bengaluru South",
-    "kupwara": "Kupwara"
+    "kupwara": "Kupwara",
+    "saving": "ಉಳಿಸಲಾಗುತ್ತಿದೆ...",
+    "save_progress": "ಪ್ರಗತಿ ಉಳಿಸಿ",
+    "generating": "ರಚಿಸಲಾಗುತ್ತಿದೆ...",
+    "guarantor's_pan_card": "ಗ್ಯಾರಂಟರ್‌ನ ಪ್ಯಾನ್ ಕಾರ್ಡ್"
   },
   "Marathi": {
     "date_of_birth": "जन्मतारीख",
@@ -4421,6 +4433,10 @@ export const UI_TRANSLATIONS = {
     "tamulpur": "Tamulpur",
     "tiruvannamalai": "Tiruvannamalai",
     "bengaluru south": "Bengaluru South",
-    "kupwara": "Kupwara"
+    "kupwara": "Kupwara",
+    "saving": "जतन करत आहे...",
+    "save_progress": "प्रगती जतन करा",
+    "generating": "तयार करत आहे...",
+    "guarantor's_pan_card": "जामीनदाराचे पॅन कार्ड"
   }
 };

@@ -888,8 +888,9 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   })();
 
   // Loan-type-specific dynamic fields, keyed by the backend's dynamic_fields
-  // keys (what gets returned to the API unchanged).
+  // Type-specific extra fields (e.g., Vehicle details for Bike/Car Loan)
   const [typeFields, setTypeFields] = useState({});
+  const [language, setLanguage] = useState("English");
   // Snapshot of exactly what was sent when the draft was generated —
   // persisted with the order, not the live form state.
   const [generatedDynamicFields, setGeneratedDynamicFields] = useState({});

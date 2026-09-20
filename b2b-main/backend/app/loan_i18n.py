@@ -149,38 +149,38 @@ def get_application_no_prefix(document_name: str) -> str:
 _COMMON_DOCUMENTS = [
     {"key": "pan_card", "document_name": "PAN Card", "description": "", "is_mandatory": True, "applicant_type": []},
     {"key": "identity_proof", "document_name": "Identity Proof", "description": "Aadhaar Card, Voter ID, Passport, or Driving Licence", "is_mandatory": True, "applicant_type": []},
-    {"key": "address_proof", "document_name": "Address Proof", "description": "Utility bill, passport, or bank statement not older than 3 months", "is_mandatory": True, "applicant_type": []},
-    {"key": "photograph", "document_name": "Passport-size Photograph", "description": "", "is_mandatory": True, "applicant_type": []},
+    {"key": "address_proof", "document_name": "Address Proof", "description": "Utility bill, passport, or bank statement not older than 3 months", "is_mandatory": False, "applicant_type": []},
+    {"key": "photograph", "document_name": "Passport-size Photograph", "description": "", "is_mandatory": False, "applicant_type": []},
 ]
 
 _GUARANTOR_DOCUMENTS = [
-    {"key": "guarantor_pan", "document_name": "Guarantor's PAN Card", "description": "", "is_mandatory": True, "applicant_type": ["guarantor"]},
-    {"key": "guarantor_address_proof", "document_name": "Guarantor's Address Proof", "description": "", "is_mandatory": True, "applicant_type": ["guarantor"]},
+    {"key": "guarantor_pan", "document_name": "Guarantor's PAN Card", "description": "", "is_mandatory": False, "applicant_type": ["guarantor"]},
+    {"key": "guarantor_address_proof", "document_name": "Guarantor's Address Proof", "description": "", "is_mandatory": False, "applicant_type": ["guarantor"]},
 ]
 
 DOCUMENT_CHECKLISTS = {
     "housing": _COMMON_DOCUMENTS + [
-        {"key": "income_proof", "document_name": "Income Proof / Salary Slips", "description": "Latest 3 months' salary slips, or last 2 years' ITR if self-employed", "is_mandatory": True, "applicant_type": ["applicant", "co_applicant"]},
-        {"key": "bank_statements", "document_name": "Bank Statements", "description": "Last 6 months' bank statement", "is_mandatory": True, "applicant_type": ["applicant", "co_applicant"]},
+        {"key": "income_proof", "document_name": "Income Proof / Salary Slips", "description": "Latest 3 months' salary slips, or last 2 years' ITR if self-employed", "is_mandatory": False, "applicant_type": ["applicant", "co_applicant"]},
+        {"key": "bank_statements", "document_name": "Bank Statements", "description": "Last 6 months' bank statement", "is_mandatory": False, "applicant_type": ["applicant", "co_applicant"]},
         {"key": "property_documents", "document_name": "Property Documents", "description": "Sale agreement, title deed, and RERA registration (if applicable)", "is_mandatory": True, "applicant_type": ["applicant"]},
         {"key": "itr", "document_name": "Income Tax Returns (last 2 years)", "description": "Required if self-employed / business income", "is_mandatory": False, "applicant_type": ["applicant", "co_applicant"]},
         {"key": "noc_builder", "document_name": "NOC from Builder / Society", "description": "", "is_mandatory": False, "applicant_type": ["applicant"]},
     ] + _GUARANTOR_DOCUMENTS,
     "vehicle": _COMMON_DOCUMENTS + [
-        {"key": "income_proof", "document_name": "Income Proof / Salary Slips", "description": "Latest 3 months' salary slips, or last 2 years' ITR if self-employed", "is_mandatory": True, "applicant_type": ["applicant", "co_applicant"]},
-        {"key": "bank_statements", "document_name": "Bank Statements", "description": "Last 6 months' bank statement", "is_mandatory": True, "applicant_type": ["applicant", "co_applicant"]},
+        {"key": "income_proof", "document_name": "Income Proof / Salary Slips", "description": "Latest 3 months' salary slips, or last 2 years' ITR if self-employed", "is_mandatory": False, "applicant_type": ["applicant", "co_applicant"]},
+        {"key": "bank_statements", "document_name": "Bank Statements", "description": "Last 6 months' bank statement", "is_mandatory": False, "applicant_type": ["applicant", "co_applicant"]},
         {"key": "vehicle_quotation", "document_name": "Vehicle Quotation / Proforma Invoice", "description": "Dealer quotation for the vehicle being financed", "is_mandatory": True, "applicant_type": ["applicant"]},
         {"key": "driving_license", "document_name": "Driving Licence", "description": "", "is_mandatory": False, "applicant_type": ["applicant"]},
     ] + _GUARANTOR_DOCUMENTS,
     "personal": _COMMON_DOCUMENTS + [
-        {"key": "income_proof", "document_name": "Income Proof / Salary Slips", "description": "Latest 3 months' salary slips, or last 2 years' ITR if self-employed", "is_mandatory": True, "applicant_type": ["applicant", "co_applicant"]},
-        {"key": "bank_statements", "document_name": "Bank Statements", "description": "Last 6 months' bank statement", "is_mandatory": True, "applicant_type": ["applicant", "co_applicant"]},
+        {"key": "income_proof", "document_name": "Income Proof / Salary Slips", "description": "Latest 3 months' salary slips, or last 2 years' ITR if self-employed", "is_mandatory": False, "applicant_type": ["applicant", "co_applicant"]},
+        {"key": "bank_statements", "document_name": "Bank Statements", "description": "Last 6 months' bank statement", "is_mandatory": False, "applicant_type": ["applicant", "co_applicant"]},
         {"key": "employment_proof", "document_name": "Employment Proof / Offer Letter", "description": "", "is_mandatory": False, "applicant_type": ["applicant"]},
     ] + _GUARANTOR_DOCUMENTS,
     "agriculture": _COMMON_DOCUMENTS + [
         {"key": "land_documents", "document_name": "Land Ownership Documents", "description": "7/12 extract, Khata certificate, or equivalent land record", "is_mandatory": True, "applicant_type": ["applicant"]},
         {"key": "crop_certificate", "document_name": "Crop / Land Holding Certificate", "description": "Village Accountant / Tehsildar certificate", "is_mandatory": False, "applicant_type": ["applicant"]},
-        {"key": "bank_statements", "document_name": "Bank Statements", "description": "Last 6 months' bank statement", "is_mandatory": True, "applicant_type": ["applicant"]},
+        {"key": "bank_statements", "document_name": "Bank Statements", "description": "Last 6 months' bank statement", "is_mandatory": False, "applicant_type": ["applicant"]},
     ] + _GUARANTOR_DOCUMENTS,
 }
 

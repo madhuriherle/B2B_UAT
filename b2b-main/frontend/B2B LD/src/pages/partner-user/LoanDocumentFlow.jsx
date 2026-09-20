@@ -764,7 +764,7 @@ const ErrorBanner = ({ message }) => {
   );
 };
 
-export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ekycService }) {
+export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ekycService, draftId: propDraftId, initialDraftData }) {
   // The org's already-configured eKYC price (organization_service_pricing) —
   // never re-entered or hardcoded here. undefined/not assigned means the org
   // has no eKYC pricing set up at all, so the option is disabled instead of
@@ -772,7 +772,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const ekycAvailable = !!ekycService;
   const loanType = getLoanTypeConfig(document?.doc_name);
   const [step, setStep] = useState(1);
-  const [language, setLanguage] = useState("English");
+  const [draftId, setDraftId] = useState(propDraftId || null);
 
   // Jump-nav targets for the mini progress strip at the top of step 1 — a
   // long form (Agriculture with 3 parties can be 100+ fields) benefits from
@@ -797,38 +797,30 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   // component unmounts — otherwise each redraft leaks the old one.
   useEffect(() => () => { if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); }, [pdfPreviewUrl]);
 
-  // Load draft on mount if available
+  // Load draft on mount if available via props
   useEffect(() => {
-    if (!document?.doc_name || draftLoaded) return;
-    
-    const loadDraft = async () => {
-      try {
-        const data = await apiRequest(`/api/partner-user/loans/drafts/${encodeURIComponent(document.doc_name)}`);
-        if (data?.form_state) {
-          const state = data.form_state;
-          if (state.formData) setFormData(state.formData);
-          if (state.parties) setParties(state.parties);
-          if (state.typeFields) setTypeFields(state.typeFields);
-          if (state.language) setLanguage(state.language);
-          if (state.useEkyc !== undefined) setUseEkyc(state.useEkyc);
-          setFormError("Loaded your saved draft.");
-        }
-      } catch (err) {
-        // 404 is normal (no draft)
-      } finally {
-        setDraftLoaded(true);
+    if (initialDraftData && !draftLoaded) {
+      const state = initialDraftData.form_state;
+      if (state) {
+        if (state.formData) setFormData(state.formData);
+        if (state.parties) setParties(state.parties);
+        if (state.typeFields) setTypeFields(state.typeFields);
+        if (state.language) setLanguage(state.language);
+        if (state.useEkyc !== undefined) setUseEkyc(state.useEkyc);
+        setFormError("Loaded your saved draft.");
       }
-    };
-    loadDraft();
-  }, [document?.doc_name, draftLoaded]);
+      setDraftLoaded(true);
+    }
+  }, [initialDraftData, draftLoaded]);
 
   const handleSaveDraft = async () => {
     setSavingDraft(true);
     setFormError(null);
     try {
-      await apiRequest("/api/partner-user/loans/drafts", {
+      const data = await apiRequest("/api/partner-user/loans/drafts", {
         method: "POST",
         body: JSON.stringify({
+          draft_id: draftId,
           document_name: document.doc_name,
           form_state: {
             parties,
@@ -839,9 +831,19 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           }
         })
       });
+      if (data && data.id) {
+        setDraftId(data.id);
+        
+        // update URL silently so a refresh doesn't lose it
+        const url = new URL(window.location);
+        if (!url.searchParams.has("draft")) {
+          url.searchParams.set("draft", data.id);
+          window.history.replaceState({}, '', url);
+        }
+      }
       setFormError("Draft saved successfully.");
     } catch (err) {
-      setFormError("Failed to save draft: " + err.message);
+      setFormError(err.message || "Failed to save draft.");
     } finally {
       setSavingDraft(false);
     }

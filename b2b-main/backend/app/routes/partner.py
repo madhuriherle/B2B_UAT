@@ -1086,6 +1086,51 @@ def list_partner_orders(
     with get_connection() as connection:
         rows = connection.execute(sql, params).fetchall()
 
+        # Fetch and append drafts if "Draft" is in statuses or status is not filtered
+        if not status or "Draft" in [s.strip() for s in status.split(",")]:
+            draft_conditions = [c.replace("o.", "") for c in conditions if "o.status" not in c]
+            drafts = connection.execute(f"""
+                SELECT id, organization_id, organization_user_id, document_name AS service_name,
+                       form_state, updated_at AS created_at, updated_at
+                FROM loan_application_drafts
+                WHERE {" AND ".join(draft_conditions)}
+            """, params).fetchall()
+
+            for d in drafts:
+                customer_name = "Draft (Incomplete)"
+                customer_email = None
+                customer_mobile = None
+                try:
+                    parties = d["form_state"].get("parties", [])
+                    if parties:
+                        customer_name = parties[0].get("name") or "Draft (Incomplete)"
+                        customer_email = parties[0].get("email")
+                        customer_mobile = parties[0].get("mobile")
+                except Exception:
+                    pass
+                
+                rows.append({
+                    "id": d["id"],
+                    "order_no": f"DRAFT-{str(d['id'])[:8].upper()}",
+                    "organization_id": d["organization_id"],
+                    "organization_user_id": d["organization_user_id"],
+                    "customer_name": customer_name,
+                    "customer_email": customer_email,
+                    "customer_mobile": customer_mobile,
+                    "service_name": d["service_name"],
+                    "document_filename": None,
+                    "amount": 0.0,
+                    "quantity": 1,
+                    "status": "Draft",
+                    "created_at": d["created_at"],
+                    "updated_at": d["updated_at"],
+                    "esign_price_per_signer": None,
+                    "esign_signers": None,
+                    "esign_latest_status": None,
+                })
+
+            rows.sort(key=lambda r: r["created_at"], reverse=True)
+
     for row in rows:
         if row["service_name"] in ("eSign", "eStamp", "Manual eStamp"):
             signers = row.get("esign_signers") or []

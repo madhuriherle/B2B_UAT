@@ -1157,6 +1157,7 @@ def generate_loan_draft(
 # per (organization_user_id, document_name) — saving again simply upserts.
 
 class LoanDraftSave(BaseModel):
+    draft_id: UUID | None = None
     document_name: str
     form_state: dict[str, Any]  # parties, formData, typeFields, language, useEkyc
 
@@ -1166,28 +1167,40 @@ def save_loan_draft(
     payload: LoanDraftSave,
     current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
 ) -> dict[str, Any]:
-    """Create or update (upsert) a loan application draft for the current user.
-    One draft per (user, document_name) — saving again overwrites the previous
-    draft for the same loan type."""
+    """Create or update a loan application draft for the current user."""
     with get_transaction() as connection:
-        row = connection.execute(
-            """
-            INSERT INTO loan_application_drafts
-                (organization_id, organization_user_id, document_name, form_state)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (organization_user_id, document_name)
-            DO UPDATE SET
-                form_state  = EXCLUDED.form_state,
-                updated_at  = now()
-            RETURNING id, document_name, updated_at
-            """,
-            (
-                current_partner_user["organization_id"],
-                current_partner_user["organization_user_id"],
-                payload.document_name,
-                json.dumps(payload.form_state),
-            ),
-        ).fetchone()
+        if payload.draft_id:
+            row = connection.execute(
+                """
+                UPDATE loan_application_drafts
+                SET form_state = %s, document_name = %s, updated_at = now()
+                WHERE id = %s AND organization_user_id = %s
+                RETURNING id, document_name, updated_at
+                """,
+                (
+                    json.dumps(payload.form_state),
+                    payload.document_name,
+                    payload.draft_id,
+                    current_partner_user["organization_user_id"],
+                ),
+            ).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Draft not found")
+        else:
+            row = connection.execute(
+                """
+                INSERT INTO loan_application_drafts
+                    (organization_id, organization_user_id, document_name, form_state)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id, document_name, updated_at
+                """,
+                (
+                    current_partner_user["organization_id"],
+                    current_partner_user["organization_user_id"],
+                    payload.document_name,
+                    json.dumps(payload.form_state),
+                ),
+            ).fetchone()
     return row
 
 
@@ -1209,29 +1222,29 @@ def list_loan_drafts(
     return rows
 
 
-@router.get("/loans/drafts/{document_name}")
-def get_loan_draft_by_doc(
-    document_name: str,
+@router.get("/loans/drafts/{draft_id}")
+def get_loan_draft_by_id(
+    draft_id: UUID,
     current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
 ) -> dict[str, Any]:
-    """Fetch a specific draft by document_name (includes full form_state)."""
+    """Fetch a specific draft by draft_id (includes full form_state)."""
     with get_connection() as connection:
         row = connection.execute(
             """
             SELECT id, document_name, form_state, updated_at
             FROM loan_application_drafts
-            WHERE document_name = %s AND organization_user_id = %s
+            WHERE id = %s AND organization_user_id = %s
             """,
-            (document_name, current_partner_user["organization_user_id"]),
+            (draft_id, current_partner_user["organization_user_id"]),
         ).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Draft not found")
     return row
 
 
-@router.delete("/loans/drafts/{document_name}", status_code=204)
+@router.delete("/loans/drafts/{draft_id}", status_code=204)
 def delete_loan_draft(
-    document_name: str,
+    draft_id: UUID,
     current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
 ) -> None:
     """Delete a draft (called after successful order submission)."""
@@ -1239,9 +1252,9 @@ def delete_loan_draft(
         result = connection.execute(
             """
             DELETE FROM loan_application_drafts
-            WHERE document_name = %s AND organization_user_id = %s
+            WHERE id = %s AND organization_user_id = %s
             """,
-            (document_name, current_partner_user["organization_user_id"]),
+            (draft_id, current_partner_user["organization_user_id"]),
         )
     if result.rowcount == 0:
         raise HTTPException(status_code=404, detail="Draft not found")

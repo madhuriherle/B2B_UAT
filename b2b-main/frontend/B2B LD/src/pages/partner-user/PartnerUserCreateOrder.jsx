@@ -340,6 +340,7 @@ const signerStatusBadge = (status) => {
 const PartnerUserCreateOrder = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const draftId = new URLSearchParams(location.search).get("draft");
   const { service: serviceParam } = useParams();
   const preselectedService = serviceParam ? decodeURIComponent(serviceParam) : "";
   const [services, setServices] = useState([]);
@@ -357,11 +358,30 @@ const PartnerUserCreateOrder = () => {
   const [result, setResult] = useState(null);
   const [esignError, setEsignError] = useState("");
   const [documentUploadError, setDocumentUploadError] = useState("");
+  const [initialDraftData, setInitialDraftData] = useState(null);
+  const [draftLoaded, setDraftLoaded] = useState(false);
   // Per-field validation errors for the eSign form, shown directly above
   // each field instead of the general top-of-form `error` banner — see
   // validateEsignFields/submitOrder. Shape: { document?, signers: [{ name?,
   // email?, mobile?, position? }, ...] }.
   const [esignFieldErrors, setEsignFieldErrors] = useState({ signers: [] });
+
+  useEffect(() => {
+    if (draftId && documents.length > 0 && !draftLoaded) {
+      apiRequest(`/api/partner-user/loans/drafts/${draftId}`)
+        .then((data) => {
+          setInitialDraftData(data);
+          // If it's a loan doc draft, the main service category is usually "Document Service"
+          // We could set it to whatever, but let's assume Document Service for doc-based loans.
+          setForm(prev => ({ ...prev, service_name: "Document Service" }));
+          const doc = documents.find(d => d.doc_name === data.document_name);
+          if (doc) setSelectedDocument(doc);
+          else setSelectedDocument({ doc_name: data.document_name, base_price: 0, config_id: null, doc_id: null, available_languages: ["English", "Hindi", "Kannada", "Marathi"] });
+        })
+        .catch(err => console.error("Failed to load draft", err))
+        .finally(() => setDraftLoaded(true));
+    }
+  }, [draftId, documents, draftLoaded]);
   // Per-field validation errors for the eKYC form, shown directly above each
   // field instead of the general top-of-form `error` banner — see
   // validateEkycFields/submitOrder. Shape: { customerName?, customerEmail?,
@@ -1848,11 +1868,13 @@ const PartnerUserCreateOrder = () => {
           <LoanDocumentFlow
             document={selectedDocument || { doc_name: form.service_name, config_id: null, doc_id: null, available_languages: ["English", "Hindi", "Kannada", "Marathi"] }}
             ekycService={services.find((s) => s.service_name === "eKYC")}
+            draftId={draftId}
+            initialDraftData={initialDraftData}
             onCancel={() => {
               if (selectedDocument) setSelectedDocument(null);
-              else setForm(prev => ({ ...prev, service_name: "" }));
+              else setForm({ ...form, service_name: "" });
             }}
-            onSubmitOrder={async (loanData) => {
+            onSubmitOrder={async (data) => {
               setSaving(true);
               setError("");
               setEsignError("");

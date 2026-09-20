@@ -148,21 +148,31 @@ const PartnerUserOrders = () => {
                   <td className="px-5 py-4"><AmountCell order={order} /></td>
                   <td className="px-5 py-4">{statusBadge(order.esign_status_label || order.status)}</td>
                   <td className="px-5 py-4">
-                    <button
-                      onClick={() =>
-                        navigate(
-                          isManualEstamp
-                            ? `/user/orders/manual-estamp/${order.id}`
-                            : isEstampBulk
-                            ? `/user/orders/estamp-bulk/${order.id}`
-                            : `/user/orders/${order.id}`
-                        )
-                      }
-                      className="px-3 py-1.5 rounded text-xs font-semibold"
-                      style={{ background: theme.goldSoft, color: theme.navy }}
-                    >
-                      View
-                    </button>
+                    {order.status === "Draft" ? (
+                      <button
+                        onClick={() => navigate(`/user/orders/create/Document%20Service?draft=${order.id}`)}
+                        className="px-3 py-1.5 rounded text-xs font-semibold"
+                        style={{ background: theme.indigoSoft, color: theme.indigo }}
+                      >
+                        Resume Draft
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          navigate(
+                            isManualEstamp
+                              ? `/user/orders/manual-estamp/${order.id}`
+                              : isEstampBulk
+                              ? `/user/orders/estamp-bulk/${order.id}`
+                              : `/user/orders/${order.id}`
+                          )
+                        }
+                        className="px-3 py-1.5 rounded text-xs font-semibold"
+                        style={{ background: theme.goldSoft, color: theme.navy }}
+                      >
+                        View
+                      </button>
+                    )}
                   </td>
                 </tr>
                 );

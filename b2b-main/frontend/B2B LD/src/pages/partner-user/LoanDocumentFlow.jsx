@@ -458,7 +458,7 @@ const FieldInput = ({ fieldKey, value, onChange, siblingValues }) => {
         style={baseInputStyle}
       >
         <option value="">{districtOptions.length ? t("Select district") : t("Select state first")}</option>
-        {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+        {districtOptions.map((d) => <option key={d} value={d}>{t(d)}</option>)}
       </select>
     );
   }
@@ -543,7 +543,7 @@ const FieldGrid = ({ fields, values, onChange }) => (
               style={baseInputStyle}
             >
               <option value="">{districtOptions.length ? t("Select district") : t("Select state first")}</option>
-              {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+              {districtOptions.map((d) => <option key={d} value={d}>{t(d)}</option>)}
             </select>
           </div>
         );
@@ -1667,7 +1667,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         {document?.base_price > 0 && (
           <div className="mt-4 pt-4 border-t" style={{ borderColor: theme.border }}>
             <p className="text-sm font-semibold tracking-wide" style={{ color: theme.ink }}>
-              Total Estimated Amount
+              {t("Total Estimated Amount")}
             </p>
             <p className="text-sm font-bold mt-1" style={{ color: theme.navy }}>
               ₹{document.base_price}

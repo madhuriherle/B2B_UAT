@@ -1639,6 +1639,7 @@ async def _create_order(
     # with the JSON-encoded structured fields the customer entered — see
     # LoanDocumentFlow.jsx) — every other caller omits it.
     loan_details: dict[str, Any] | None = None,
+    document_config_id: UUID | None = None,
 ) -> dict[str, Any]:
     if service_name not in get_active_service_names():
         raise HTTPException(status_code=400, detail=f"Unknown service '{service_name}'")
@@ -1667,6 +1668,22 @@ async def _create_order(
                 status_code=400,
                 detail=f"'{service_name}' is not enabled for your account. Contact Super Admin.",
             )
+
+        base_amount = float(pricing["price"] or 0)
+        doc_esign_price = None
+        if service_name == "Document Service" and document_config_id is not None:
+            doc_config = connection.execute(
+                """
+                SELECT base_price, esign_price, status 
+                FROM organization_document_config 
+                WHERE id = %s AND organization_id = %s
+                """,
+                (document_config_id, organization_id)
+            ).fetchone()
+            if not doc_config or not doc_config["status"]:
+                raise HTTPException(status_code=400, detail="Selected document is not enabled or not found.")
+            base_amount = float(doc_config["base_price"] or 0)
+            doc_esign_price = float(doc_config["esign_price"] or 0)
 
         organization = connection.execute(
             "SELECT payment_mode FROM organizations WHERE id = %s",
@@ -1736,7 +1753,7 @@ async def _create_order(
         active_charges = [{"charge_name": row["charge_name"], "price": float(row["price"] or 0)} for row in charge_rows]
     charges_total = sum(c["price"] for c in active_charges)
 
-    amount = float(pricing["price"] or 0) * quantity + charges_total
+    amount = base_amount * quantity + charges_total
     status = "Draft" if action == "draft" else "Submitted"
     is_esign = service_name == "eSign"
 
@@ -1802,6 +1819,8 @@ async def _create_order(
         f.write(raw_bytes)
 
     esign_price_per_signer = float(pricing["price"] or 0) if is_esign else None
+    if service_name == "Document Service" and document_config_id is not None:
+        esign_price_per_signer = doc_esign_price
 
     with get_transaction() as connection:
         seq = connection.execute("SELECT nextval('orders_order_no_seq') AS n").fetchone()
@@ -1903,6 +1922,7 @@ async def create_partner_order(
     quantity: int = Form(1),
     doc_type: str | None = Form(None),
     bulk_ekyc_record_id: UUID | None = Form(None),
+    document_config_id: UUID | None = Form(None),
     current_partner: dict[str, Any] = Depends(get_current_partner),
 ) -> dict[str, Any]:
     return await _create_order(
@@ -1918,6 +1938,7 @@ async def create_partner_order(
         quantity=quantity,
         document_type=doc_type,
         bulk_ekyc_record_id=bulk_ekyc_record_id,
+        document_config_id=document_config_id,
     )
 
 

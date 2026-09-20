@@ -921,6 +921,9 @@ const PartnerUserCreateOrder = () => {
       formData.append("quantity", String(copiesCount));
       formData.append("action", action);
       formData.append("document", file);
+      if (selectedDocument && selectedDocument.document_config_id) {
+        formData.append("document_config_id", selectedDocument.document_config_id);
+      }
       if (isEkyc) {
         // Maps directly onto SignDesk's General Document Verification API
         // payload: { doc_type, verification } (source/reference_id are built
@@ -1861,6 +1864,9 @@ const PartnerUserCreateOrder = () => {
                 if (loanData.customer_email) fd.append("customer_email", loanData.customer_email);
                 fd.append("customer_mobile", loanData.customer_mobile || "9999999999");
                 fd.append("document", loanData.file);
+                if (selectedDocument && selectedDocument.document_config_id) {
+                  fd.append("document_config_id", selectedDocument.document_config_id);
+                }
                 if (loanData.loan_details) {
                   fd.append("loan_details", JSON.stringify(loanData.loan_details));
                 }

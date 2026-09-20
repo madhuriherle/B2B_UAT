@@ -1359,21 +1359,32 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           {document.doc_name} Application
         </h2>
 
-        <div className="sticky top-0 z-10 flex gap-1.5 flex-wrap -mx-1 px-1 py-2" style={{ background: theme.card }}>
+        <div className="sticky top-0 z-10 flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 py-3 border-b mb-4" style={{ background: theme.card, borderColor: theme.border }}>
           {[
-            { label: "Applicants", ref: applicantsSectionRef },
             { label: "Loan Details", ref: loanDetailsSectionRef },
+            { label: "Parties & KYC", ref: applicantsSectionRef },
             { label: "Documents", ref: documentsSectionRef },
-          ].map((s) => (
-            <button
-              key={s.label}
-              type="button"
-              onClick={() => scrollToSection(s.ref)}
-              className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors hover:opacity-80"
-              style={{ borderColor: theme.border, color: theme.navy, background: theme.bg }}
-            >
-              {s.label}
-            </button>
+          ].map((s, idx) => (
+            <React.Fragment key={s.label}>
+              <button
+                type="button"
+                onClick={() => scrollToSection(s.ref)}
+                className="flex items-center gap-2 sm:gap-3 px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl transition font-medium text-xs sm:text-sm whitespace-nowrap border"
+                style={{ background: "#fff", borderColor: theme.border, color: theme.ink }}
+                onMouseOver={(e) => { e.currentTarget.style.borderColor = theme.navy; e.currentTarget.style.background = theme.bg; }}
+                onMouseOut={(e) => { e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.background = "#fff"; }}
+              >
+                <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white" style={{ background: theme.navy }}>
+                  {idx + 1}
+                </span>
+                <span className="font-bold">{s.label}</span>
+              </button>
+              {idx < 2 && (
+                <div className="flex items-center justify-center">
+                  <span className="text-slate-300 text-xs shrink-0 font-bold px-1">&gt;</span>
+                </div>
+              )}
+            </React.Fragment>
           ))}
         </div>
 
@@ -1559,54 +1570,50 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           ) : partyChecklistGroups.length === 0 ? (
             <p className="text-xs" style={{ color: theme.slate }}>No documents required.</p>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-6">
               {partyChecklistGroups.map(({ uiKey, label, items }) => (
                 <div key={uiKey}>
-                  <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>{label}</p>
-                  <div className="space-y-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider mb-2.5" style={{ color: theme.slate }}>{label}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {items.map((item) => {
                       const compositeKey = checklistItemKey(uiKey, item.key);
                       const file = checklistFiles[compositeKey];
                       return (
-                        <div key={compositeKey} className="flex items-start justify-between gap-3 rounded border p-2.5" style={{ borderColor: theme.border }}>
-                          <label className="flex items-start gap-2 text-sm flex-1 min-w-0">
-                            <input type="checkbox" checked={confirmedDocKeys.has(compositeKey)} onChange={() => toggleDocConfirmed(compositeKey)} className="mt-0.5 shrink-0" />
-                            <span className="min-w-0">
-                              {item.document_name}
-                              {item.is_mandatory && <span className="text-red-600"> *</span>}
-                              {item.description && <span className="block text-xs" style={{ color: theme.slate }}>{item.description}</span>}
-                              {file && (
-                                <span className="flex items-center gap-1 text-xs mt-1" style={{ color: theme.success }}>
-                                  <FileCheck2 size={13} /> <span className="truncate max-w-[200px]">{file.name}</span>
-                                </span>
-                              )}
-                            </span>
-                          </label>
-                          <div className="shrink-0">
-                            {file ? (
-                              <button
-                                type="button"
-                                onClick={() => removeChecklistFile(compositeKey)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded border text-xs font-semibold text-red-600"
-                                style={{ borderColor: theme.border }}
-                              >
-                                <X size={13} /> Remove
-                              </button>
-                            ) : (
-                              <label
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded border text-xs font-semibold cursor-pointer whitespace-nowrap"
-                                style={{ borderColor: theme.border, color: theme.navy }}
-                              >
-                                <Upload size={13} /> Upload
-                                <input
-                                  type="file"
-                                  accept="image/jpeg,image/png,application/pdf"
-                                  className="hidden"
-                                  onChange={(e) => { setChecklistFile(compositeKey, e.target.files?.[0]); e.target.value = ""; }}
-                                />
-                              </label>
-                            )}
+                        <div key={compositeKey} className={`relative flex flex-col justify-between rounded-2xl border-2 transition p-4 ${file ? 'bg-slate-50/50' : 'bg-white hover:border-indigo-400 cursor-pointer'}`} style={{ borderColor: file ? theme.border : theme.border, borderStyle: file ? 'solid' : 'dashed' }}>
+                          <div className="flex items-start justify-between gap-3 mb-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: file ? '#E0E7FF' : '#F1F5F9', color: file ? '#4338CA' : '#64748B' }}>
+                                {file ? <FileCheck2 size={18} /> : <Upload size={18} />}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                                  {item.document_name} {item.is_mandatory && <span className="text-red-500">*</span>}
+                                </h4>
+                                {item.description && <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>}
+                                {!file && <p className="text-[10px] text-slate-400 mt-1">PDF, JPG, or PNG under 5MB</p>}
+                              </div>
+                            </div>
+                            <label className="flex items-center gap-1.5 cursor-pointer z-10" title="Confirm manually without file">
+                              <input type="checkbox" checked={confirmedDocKeys.has(compositeKey)} onChange={() => toggleDocConfirmed(compositeKey)} className="w-4 h-4 cursor-pointer" />
+                            </label>
                           </div>
+                          
+                          {file ? (
+                            <div className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between shadow-sm">
+                              <div className="flex items-center gap-2.5 overflow-hidden">
+                                <FileCheck2 size={16} className="text-emerald-600 shrink-0" />
+                                <span className="text-xs font-bold text-slate-800 truncate" title={file.name}>{file.name}</span>
+                              </div>
+                              <button type="button" onClick={() => removeChecklistFile(compositeKey)} className="text-slate-400 hover:text-red-600 p-1 shrink-0 z-10">
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="w-full py-2 rounded-xl text-center text-xs font-bold transition shadow-sm cursor-pointer border" style={{ background: theme.bg, color: theme.navy, borderColor: theme.border }}>
+                              <input type="file" accept="image/jpeg,image/png,application/pdf" className="hidden" onChange={(e) => { setChecklistFile(compositeKey, e.target.files?.[0]); e.target.value = ""; }} />
+                              Browse file to upload
+                            </label>
+                          )}
                         </div>
                       );
                     })}
@@ -1622,6 +1629,17 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         )}
 
         <ErrorBanner message={formError} />
+
+        {document?.base_price != null && (
+          <div className="mt-4 pt-4 border-t" style={{ borderColor: theme.border }}>
+            <p className="text-sm font-semibold tracking-wide" style={{ color: theme.ink }}>
+              Total Estimated Amount
+            </p>
+            <p className="text-sm font-bold mt-1" style={{ color: theme.navy }}>
+              ₹{document.base_price}
+            </p>
+          </div>
+        )}
 
         <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
           <button onClick={onCancel} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Cancel</button>
@@ -1662,7 +1680,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Finalization</label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setRequireEsign(true)} className="px-4 py-2 rounded text-sm font-semibold border" style={{ background: requireEsign ? theme.navy : "#fff", color: requireEsign ? "#fff" : theme.ink, borderColor: requireEsign ? theme.navy : theme.border }}>
-              Verify with eSign
+              Verify with eSign{document?.esign_price ? ` (₹${document.esign_price}/signer)` : ""}
             </button>
             <button type="button" onClick={() => setRequireEsign(false)} className="px-4 py-2 rounded text-sm font-semibold border" style={{ background: !requireEsign ? theme.navy : "#fff", color: !requireEsign ? "#fff" : theme.ink, borderColor: !requireEsign ? theme.navy : theme.border }}>
               Without Sign

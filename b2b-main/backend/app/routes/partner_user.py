@@ -1274,6 +1274,7 @@ async def create_my_order(
     doc_type: str | None = Form(None),
     bulk_ekyc_record_id: UUID | None = Form(None),
     loan_details: str | None = Form(None),
+    document_config_id: UUID | None = Form(None),
     current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
 ) -> dict[str, Any]:
     # organization_user_id is always the caller's own membership — a Partner
@@ -1302,6 +1303,7 @@ async def create_my_order(
         document_type=doc_type,
         bulk_ekyc_record_id=bulk_ekyc_record_id,
         loan_details=parsed_loan_details,
+        document_config_id=document_config_id,
     )
 
 

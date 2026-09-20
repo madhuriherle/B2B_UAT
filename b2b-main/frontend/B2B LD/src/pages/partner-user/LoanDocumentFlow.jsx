@@ -271,7 +271,7 @@ const LOAN_TYPE_CONFIG = {
   agriculture: {
     match: (name) => name.includes("agriculture"),
     sections: [
-      { title: "Farm Details", fields: ["farm_location", "village", "taluk", "district", "state", "land_ownership", "total_land_area", "cultivated_area", "survey_number", "land_registration_details", "lease_details"] },
+      { title: "Farm Details", fields: ["farm_location", "state", "district", "village", "taluk", "land_ownership", "total_land_area", "cultivated_area", "survey_number", "land_registration_details", "lease_details"] },
       { title: "Crop Details", fields: ["crop_type", "crop_season", "cultivation_area", "irrigation_type", "expected_yield", "estimated_crop_value", "expected_harvest_date"] },
       { title: "Financial Details", fields: ["required_loan_amount", "sanctioned_loan_amount", "existing_agri_loans", "other_agri_income"] },
     ],
@@ -327,9 +327,9 @@ const PARTY_ADDRESS_FIELDS = [
   { key: "house_no", label: "House / Flat / Building No.", type: "text" },
   { key: "street", label: "Street / Area / Locality", type: "text" },
   { key: "landmark", label: "Landmark", type: "text" },
-  { key: "city", label: "City", type: "text" },
+    { key: "state", label: "State", type: "select", options: INDIAN_STATES },
   { key: "district", label: "District", type: "text" },
-  { key: "state", label: "State", type: "select", options: INDIAN_STATES },
+  { key: "city", label: "City", type: "text" },
   { key: "pincode", label: "Pincode", type: "text", maxLength: 6 },
   { key: "country", label: "Country", type: "text" },
   { key: "mobile", label: "Mobile Number", type: "text" },
@@ -656,7 +656,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
         </span>
         <span className="flex items-center gap-3">
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "#fff", color: theme.slate, border: `1px solid ${theme.border}` }}>
-            {filled} {t("filled")}/{total} filled
+            {filled}/{total} {t("filled")}
           </span>
           {removable && (
             <button
@@ -1419,10 +1419,10 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Identity Verification")}</label>
           <div className="flex gap-2 items-center flex-wrap">
             <button type="button" onClick={() => setUseEkyc(false)} className="px-4 py-2 rounded text-sm font-semibold border" style={{ background: !useEkyc ? theme.navy : "#fff", color: !useEkyc ? "#fff" : theme.ink, borderColor: !useEkyc ? theme.navy : theme.border }}>
-              Manual Form
+              {t("Manual Form")}
             </button>
             <button type="button" disabled={!ekycAvailable} onClick={() => setUseEkyc(true)} title={ekycAvailable ? "" : "eKYC isn't enabled for your account"} className="px-4 py-2 rounded text-sm font-semibold border disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: useEkyc ? theme.navy : "#fff", color: useEkyc ? "#fff" : theme.ink, borderColor: useEkyc ? theme.navy : theme.border }}>
-              Continue with eKYC{ekycAvailable ? ` (₹${ekycService.price})` : ""}
+              {t("Continue with eKYC")}{ekycAvailable ? ` (₹${ekycService.price})` : ""}
             </button>
           </div>
           {!ekycAvailable && (

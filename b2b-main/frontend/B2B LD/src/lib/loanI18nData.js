@@ -284,7 +284,11 @@ export const UI_TRANSLATIONS = {
     "Land Ownership Documents": "Land Ownership Documents",
     "7/12 extract, Khata certificate, or equivalent land record": "7/12 extract, Khata certificate, or equivalent land record",
     "Crop / Land Holding Certificate": "Crop / Land Holding Certificate",
-    "Village Accountant / Tehsildar certificate": "Village Accountant / Tehsildar certificate"
+    "Village Accountant / Tehsildar certificate": "Village Accountant / Tehsildar certificate",
+    "identity_verification": "Identity Verification",
+    "manual_form": "Manual Form",
+    "continue_with_ekyc": "Continue with eKYC",
+    "mobile_number": "Mobile Number"
   },
   "Hindi": {
     "date_of_birth": "जन्म तारीख",
@@ -571,7 +575,11 @@ export const UI_TRANSLATIONS = {
     "Land Ownership Documents": "ज़मीन के मालिकाना हक़ के दस्तावेज़",
     "7/12 extract, Khata certificate, or equivalent land record": "7/12 अर्क, खाता प्रमाणपत्र, या समकक्ष भूमि रिकॉर्ड",
     "Crop / Land Holding Certificate": "फसल / भूमि धारण प्रमाणपत्र",
-    "Village Accountant / Tehsildar certificate": "ग्राम लेखाकार / तहसीलदार प्रमाणपत्र"
+    "Village Accountant / Tehsildar certificate": "ग्राम लेखाकार / तहसीलदार प्रमाणपत्र",
+    "identity_verification": "पहचान सत्यापन",
+    "manual_form": "मैनुअल फॉर्म",
+    "continue_with_ekyc": "eKYC के साथ जारी रखें",
+    "mobile_number": "मोबाइल नंबर"
   },
   "Kannada": {
     "date_of_birth": "ಹುಟ್ಟಿದ ದಿನಾಂಕ",
@@ -858,7 +866,11 @@ export const UI_TRANSLATIONS = {
     "Land Ownership Documents": "ಭೂ ಮಾಲೀಕತ್ವದ ದಾಖಲೆಗಳು",
     "7/12 extract, Khata certificate, or equivalent land record": "7/12 ಉತಾರ, ಖಾತಾ ಪ್ರಮಾಣಪತ್ರ, ಅಥವಾ ಸಮಾನ ಭೂ ದಾಖಲೆ",
     "Crop / Land Holding Certificate": "ಬೆಳೆ / ಭೂಮಿ ಹಿಡುವಳಿ ಪ್ರಮಾಣಪತ್ರ",
-    "Village Accountant / Tehsildar certificate": "ಗ್ರಾಮ ಲೆಕ್ಕಿಗ / ತಹಶೀಲ್ದಾರ್ ಪ್ರಮಾಣಪತ್ರ"
+    "Village Accountant / Tehsildar certificate": "ಗ್ರಾಮ ಲೆಕ್ಕಿಗ / ತಹಶೀಲ್ದಾರ್ ಪ್ರಮಾಣಪತ್ರ",
+    "identity_verification": "ಗುರುತು ಪರಿಶೀಲನೆ",
+    "manual_form": "ಮ್ಯಾನುಯಲ್ ಫಾರ್ಮ್",
+    "continue_with_ekyc": "eKYC ನೊಂದಿಗೆ ಮುಂದುವರಿಯಿರಿ",
+    "mobile_number": "ಮೊಬೈಲ್ ಸಂಖ್ಯೆ"
   },
   "Marathi": {
     "date_of_birth": "जन्मतारीख",
@@ -1145,6 +1157,10 @@ export const UI_TRANSLATIONS = {
     "Land Ownership Documents": "जमिनीच्या मालकीची कागदपत्रे",
     "7/12 extract, Khata certificate, or equivalent land record": "7/12 उतारा, खाते प्रमाणपत्र, किंवा समतुल्य जमीन रेकॉर्ड",
     "Crop / Land Holding Certificate": "पीक / जमीन धारण प्रमाणपत्र",
-    "Village Accountant / Tehsildar certificate": "गाव कामगार तलाठी / तहसीलदार प्रमाणपत्र"
+    "Village Accountant / Tehsildar certificate": "गाव कामगार तलाठी / तहसीलदार प्रमाणपत्र",
+    "identity_verification": "ओळख पडताळणी",
+    "manual_form": "मॅन्युअल फॉर्म",
+    "continue_with_ekyc": "eKYC सह पुढे जा",
+    "mobile_number": "मोबाईल नंबर"
   }
 };

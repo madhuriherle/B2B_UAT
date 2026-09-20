@@ -783,6 +783,8 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const scrollToSection = (ref) => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   const [useEkyc, setUseEkyc] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
   // Validation/error messages surface as an inline banner (see ErrorBanner
   // below), matching PartnerUserCreateOrder.jsx's own error-display
   // convention — never a native alert()/confirm() popup. A string for a
@@ -794,6 +796,56 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   // Revoke the previous blob URL whenever a new one is created or the
   // component unmounts — otherwise each redraft leaks the old one.
   useEffect(() => () => { if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); }, [pdfPreviewUrl]);
+
+  // Load draft on mount if available
+  useEffect(() => {
+    if (!document?.doc_name || draftLoaded) return;
+    
+    const loadDraft = async () => {
+      try {
+        const data = await apiRequest(`/api/partner-user/loans/drafts/${encodeURIComponent(document.doc_name)}`);
+        if (data?.form_state) {
+          const state = data.form_state;
+          if (state.formData) setFormData(state.formData);
+          if (state.parties) setParties(state.parties);
+          if (state.typeFields) setTypeFields(state.typeFields);
+          if (state.language) setLanguage(state.language);
+          if (state.useEkyc !== undefined) setUseEkyc(state.useEkyc);
+          setFormError("Loaded your saved draft.");
+        }
+      } catch (err) {
+        // 404 is normal (no draft)
+      } finally {
+        setDraftLoaded(true);
+      }
+    };
+    loadDraft();
+  }, [document?.doc_name, draftLoaded]);
+
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
+    setFormError(null);
+    try {
+      await apiRequest("/api/partner-user/loans/drafts", {
+        method: "POST",
+        body: JSON.stringify({
+          document_name: document.doc_name,
+          form_state: {
+            parties,
+            formData,
+            typeFields,
+            language,
+            useEkyc
+          }
+        })
+      });
+      setFormError("Draft saved successfully.");
+    } catch (err) {
+      setFormError("Failed to save draft: " + err.message);
+    } finally {
+      setSavingDraft(false);
+    }
+  };
 
   // Application-level fields (not per-party).
   const [formData, setFormData] = useState({
@@ -1636,7 +1688,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
         <ErrorBanner message={formError} />
 
-        {document?.base_price != null && (
+        {document?.base_price > 0 && (
           <div className="mt-4 pt-4 border-t" style={{ borderColor: theme.border }}>
             <p className="text-sm font-semibold tracking-wide" style={{ color: theme.ink }}>
               Total Estimated Amount
@@ -1649,7 +1701,19 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
         <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
           <button onClick={onCancel} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Cancel</button>
-          <button disabled={generating || ekycStage === "verifying"} onClick={handleGenerateDraft} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
+          
+          <div className="flex-1"></div>
+          
+          <button 
+            disabled={generating || ekycStage === "verifying" || savingDraft} 
+            onClick={handleSaveDraft} 
+            className="px-5 py-2.5 rounded text-sm font-semibold border disabled:opacity-60" 
+            style={{ background: "#fff", borderColor: theme.navy, color: theme.navy }}
+          >
+            {savingDraft ? "Saving..." : "Save as Draft"}
+          </button>
+          
+          <button disabled={generating || ekycStage === "verifying" || savingDraft} onClick={handleGenerateDraft} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
             {generating ? "Generating..." : "Generate Draft"}
           </button>
         </div>
@@ -1906,7 +1970,10 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         <ErrorBanner message={formError} />
 
         <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
-          <button disabled={finalizing} onClick={() => { setFormError(null); setStep(1); }} className="px-5 py-2.5 rounded text-sm font-semibold border disabled:opacity-60" style={{ background: "#fff", borderColor: theme.border }}>Back</button>
+          <button disabled={finalizing} onClick={() => { setFormError(null); setStep(1); }} className="px-5 py-2.5 rounded text-sm font-semibold border disabled:opacity-60" style={{ background: "#fff", borderColor: theme.border }} title="Go back to edit your inputs">← Edit Details</button>
+          
+          <div className="flex-1"></div>
+          
           <button disabled={finalizing} onClick={handleFinalize} className="px-5 py-2.5 rounded text-sm font-semibold text-white disabled:opacity-60" style={{ background: theme.navy }}>
             {finalizing ? "Submitting..." : requireEsign ? "Submit & Send for eSign" : "Save Document"}
           </button>

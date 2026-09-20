@@ -1151,6 +1151,102 @@ def generate_loan_draft(
     return Response(content=pdf_bytes, media_type="application/pdf")
 
 
+# ── Loan Application Drafts ──────────────────────────────────────────────────
+# A draft stores the full Step 1 form state (parties, formData, typeFields,
+# language, useEkyc) as JSONB so the partner user can resume later. One draft
+# per (organization_user_id, document_name) — saving again simply upserts.
+
+class LoanDraftSave(BaseModel):
+    document_name: str
+    form_state: dict[str, Any]  # parties, formData, typeFields, language, useEkyc
+
+
+@router.post("/loans/drafts", status_code=201)
+def save_loan_draft(
+    payload: LoanDraftSave,
+    current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
+) -> dict[str, Any]:
+    """Create or update (upsert) a loan application draft for the current user.
+    One draft per (user, document_name) — saving again overwrites the previous
+    draft for the same loan type."""
+    with get_transaction() as connection:
+        row = connection.execute(
+            """
+            INSERT INTO loan_application_drafts
+                (organization_id, organization_user_id, document_name, form_state)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (organization_user_id, document_name)
+            DO UPDATE SET
+                form_state  = EXCLUDED.form_state,
+                updated_at  = now()
+            RETURNING id, document_name, updated_at
+            """,
+            (
+                current_partner_user["organization_id"],
+                current_partner_user["organization_user_id"],
+                payload.document_name,
+                json.dumps(payload.form_state),
+            ),
+        ).fetchone()
+    return row
+
+
+@router.get("/loans/drafts")
+def list_loan_drafts(
+    current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
+) -> list[dict[str, Any]]:
+    """All saved drafts for the current user — one per loan type at most."""
+    with get_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, document_name, updated_at
+            FROM loan_application_drafts
+            WHERE organization_user_id = %s
+            ORDER BY updated_at DESC
+            """,
+            (current_partner_user["organization_user_id"],),
+        ).fetchall()
+    return rows
+
+
+@router.get("/loans/drafts/{document_name}")
+def get_loan_draft_by_doc(
+    document_name: str,
+    current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
+) -> dict[str, Any]:
+    """Fetch a specific draft by document_name (includes full form_state)."""
+    with get_connection() as connection:
+        row = connection.execute(
+            """
+            SELECT id, document_name, form_state, updated_at
+            FROM loan_application_drafts
+            WHERE document_name = %s AND organization_user_id = %s
+            """,
+            (document_name, current_partner_user["organization_user_id"]),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    return row
+
+
+@router.delete("/loans/drafts/{document_name}", status_code=204)
+def delete_loan_draft(
+    document_name: str,
+    current_partner_user: dict[str, Any] = Depends(get_current_partner_user),
+) -> None:
+    """Delete a draft (called after successful order submission)."""
+    with get_transaction() as connection:
+        result = connection.execute(
+            """
+            DELETE FROM loan_application_drafts
+            WHERE document_name = %s AND organization_user_id = %s
+            """,
+            (document_name, current_partner_user["organization_user_id"]),
+        )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+
 @router.get("/loans/documents")
 def get_loan_document_checklist(
     document_name: str,

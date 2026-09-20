@@ -737,6 +737,8 @@ const ErrorBanner = ({ message }) => {
 };
 
 export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ekycService, draftId: propDraftId, initialDraftData }) {
+  const [language, setLanguage] = useState("English");
+  window.currentLoanLanguage = language;
   // The org's already-configured eKYC price (organization_service_pricing) —
   // never re-entered or hardcoded here. undefined/not assigned means the org
   // has no eKYC pricing set up at all, so the option is disabled instead of

@@ -160,7 +160,7 @@ const SectionHeading = ({ title }) => {
   return (
     <h4 className="text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: theme.navy }}>
       {Icon && <Icon size={14} strokeWidth={2.25} />}
-      {title}
+      {displayTitle}
     </h4>
   );
 };
@@ -457,7 +457,7 @@ const FieldInput = ({ fieldKey, value, onChange, siblingValues }) => {
         className={inputClass}
         style={baseInputStyle}
       >
-        <option value="">{districtOptions.length ? "Select district" : "Select state first"}</option>
+        <option value="">{districtOptions.length ? t("Select district") : t("Select state first")}</option>
         {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
       </select>
     );
@@ -465,7 +465,7 @@ const FieldInput = ({ fieldKey, value, onChange, siblingValues }) => {
   if (cfg.type === "select") {
     return (
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} style={baseInputStyle}>
-        <option value="">Select {cfg.label.toLowerCase()}</option>
+        <option value="">{t("Select")} {t(cfg.label).toLowerCase()}</option>
         {cfg.options.map((o) => <option key={o} value={o}>{t(o)}</option>)}
       </select>
     );
@@ -542,7 +542,7 @@ const FieldGrid = ({ fields, values, onChange }) => (
               className={inputClass}
               style={baseInputStyle}
             >
-              <option value="">{districtOptions.length ? "Select district" : "Select state first"}</option>
+              <option value="">{districtOptions.length ? t("Select district") : t("Select state first")}</option>
               {districtOptions.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
@@ -580,7 +580,7 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
           className="w-full flex items-center justify-center gap-1.5 py-3 rounded border-2 border-dashed text-xs font-semibold transition-colors hover:bg-slate-50"
           style={{ borderColor: theme.border, color: theme.slate }}
         >
-          <Plus size={14} /> Add {title.toLowerCase()}
+          <Plus size={14} /> {t("Add")} {t(title).toLowerCase()}
         </button>
       ) : (
         <>
@@ -596,7 +596,7 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
             </div>
           ))}
           <button type="button" onClick={addRow} className="text-xs font-semibold inline-flex items-center gap-1" style={{ color: theme.navy }}>
-            <Plus size={12} /> Add row
+            <Plus size={12} /> {t("Add row")}
           </button>
         </>
       )}
@@ -677,14 +677,14 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
 
         <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
           <SectionHeading title="Address" />
-          <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Present Address</p>
+          <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>{t("Present Address")}</p>
           <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} />
 
           <label className="flex items-center gap-2 mt-3 text-xs font-semibold" style={{ color: theme.ink }}>
             <input type="checkbox" checked={party.address.permanent_same_as_present} onChange={(e) => togglePermanentSame(e.target.checked)} /> {t("Permanent address same as present")}</label>
           {!party.address.permanent_same_as_present && (
             <div className="mt-2">
-              <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Permanent Address</p>
+              <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>{t("Permanent Address")}</p>
               <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.permanent} onChange={updatePermanent} />
             </div>
           )}
@@ -693,7 +693,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
             <input type="checkbox" checked={!!party.address.office} onChange={(e) => toggleOffice(e.target.checked)} /> {t("Add office / business address")}</label>
           {party.address.office && (
             <div className="mt-2">
-              <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Office / Business Address</p>
+              <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>{t("Office / Business Address")}</p>
               <FieldGrid fields={PARTY_ADDRESS_FIELDS} values={party.address.office} onChange={updateOffice} />
             </div>
           )}
@@ -724,7 +724,7 @@ const ErrorBanner = ({ message }) => {
     <div className="rounded p-3 text-sm" style={{ background: theme.dangerSoft, border: `1px solid ${theme.danger}33`, color: theme.danger }}>
       {Array.isArray(message) ? (
         <>
-          <p className="font-semibold mb-1">Please fill in the following required fields:</p>
+          <p className="font-semibold mb-1">{t("Please fill in the following required fields:")}</p>
           <ul className="list-disc list-inside space-y-0.5">
             {message.map((m) => <li key={m}>{m}</li>)}
           </ul>
@@ -1396,14 +1396,14 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           <h1 className="text-2xl font-bold text-slate-800" style={{ fontFamily: serif }}>
             {document.doc_name} Application
           </h1>
-          <p className="text-slate-500 mt-1 text-sm">Please complete the steps below to submit your application.</p>
+          <p className="text-slate-500 mt-1 text-sm">{t("Please complete the steps below to submit your application.")}</p>
         </div>
 
         {/* Card 1: Loan Details & Settings */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" ref={loanDetailsSectionRef}>
           <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">1</div>
-            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Loan Details & Settings</h2>
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">{t("Loan Details & Settings")}</h2>
           </div>
           <div className="p-6 space-y-6">
             <div>
@@ -1460,8 +1460,8 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Document Type")}</label>
                     <select value={ekycDocType} onChange={e => setEkycDocType(e.target.value)} disabled={ekycStage === "verifying" || ekycStage === "fetching"} className={inputClass} style={baseInputStyle}>
-                      <option value="">Select document type</option>
-                      {EKYC_DOC_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                      <option value="">{t("Select document type")}</option>
+                      {EKYC_DOC_TYPES.map(d => <option key={d.value} value={d.value}>{t(d.label)}</option>)}
                     </select>
                   </div>
                   <div>
@@ -1501,7 +1501,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" ref={applicantsSectionRef}>
           <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">2</div>
-            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Parties & KYC</h2>
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">{t("Parties & KYC")}</h2>
           </div>
           <div className="p-6">
             
@@ -1545,11 +1545,11 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" ref={loanDetailsSectionRef}>
           <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">3</div>
-            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Loan Details</h2>
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">{t("Loan Details")}</h2>
           </div>
           <div className="p-6 space-y-6" style={{ background: "#F8FAFC" }}>
             <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
-              <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Base Configuration</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>{t("Base Configuration")}</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Loan Amount")}<span style={{ color: "#dc2626" }}> *</span></label>
@@ -1595,13 +1595,13 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden" ref={documentsSectionRef}>
           <div className="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm">4</div>
-            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Required Documents</h2>
+            <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">{t("Required Documents")}</h2>
           </div>
           <div className="p-6">
           {checklistLoading ? (
-            <p className="text-xs" style={{ color: theme.slate }}>Loading checklist...</p>
+            <p className="text-xs" style={{ color: theme.slate }}>{t("Loading checklist...")}</p>
           ) : partyChecklistGroups.length === 0 ? (
-            <p className="text-xs" style={{ color: theme.slate }}>No documents required.</p>
+            <p className="text-xs" style={{ color: theme.slate }}>{t("No documents required.")}</p>
           ) : (
             <div className="space-y-6">
               {partyChecklistGroups.map(({ uiKey, label, items }) => (
@@ -1676,7 +1676,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         )}
 
         <div className="sticky bottom-0 flex gap-2 mt-4 pt-4 pb-1 border-t" style={{ borderColor: theme.border, background: theme.card, boxShadow: "0 -4px 12px rgba(15,23,42,0.06)" }}>
-          <button onClick={onCancel} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>Cancel</button>
+          <button onClick={onCancel} className="px-5 py-2.5 rounded text-sm font-semibold border" style={{ background: "#fff", borderColor: theme.border }}>{t("Cancel")}</button>
           
           <div className="flex-1"></div>
           
@@ -1772,25 +1772,25 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             <div className="mt-4 rounded-xl border overflow-hidden" style={{ borderColor: theme.border }}>
               {/* Header */}
               <div className="px-4 py-3 border-b" style={{ background: "#F8FAFC", borderColor: theme.border }}>
-                <h3 className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.navy }}>Order Summary</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.navy }}>{t("Order Summary")}</h3>
               </div>
 
               {/* Price breakdown */}
               <div className="px-4 py-3 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span style={{ color: theme.slate }}>Number of Signers</span>
+                  <span style={{ color: theme.slate }}>{t("Number of Signers")}</span>
                   <span className="font-semibold" style={{ color: theme.ink }}>{signingCount}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span style={{ color: theme.slate }}>eSign Price</span>
+                  <span style={{ color: theme.slate }}>{t("eSign Price")}</span>
                   <span className="font-semibold" style={{ color: theme.ink }}>&#8377;{document.esign_price} &times; {signingCount} = &#8377;{basePrice.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span style={{ color: theme.slate }}>GST (18%)</span>
+                  <span style={{ color: theme.slate }}>{t("GST (18%)")}</span>
                   <span className="font-semibold" style={{ color: theme.ink }}>&#8377;{gst.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm pt-2 border-t font-bold" style={{ borderColor: theme.border }}>
-                  <span style={{ color: theme.ink }}>Total</span>
+                  <span style={{ color: theme.ink }}>{t("Total")}</span>
                   <span style={{ color: theme.navy }}>&#8377;{total.toFixed(2)}</span>
                 </div>
               </div>
@@ -1844,11 +1844,11 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                               minWidth: 110,
                             }}
                           >
-                            <option value="auto">Auto</option>
-                            <option value="bottom-left">Bottom-Left</option>
-                            <option value="bottom-right">Bottom-Right</option>
-                            <option value="top-left">Top-Left</option>
-                            <option value="top-right">Top-Right</option>
+                            <option value="auto">{t("Auto")}</option>
+                            <option value="bottom-left">{t("Bottom-Left")}</option>
+                            <option value="bottom-right">{t("Bottom-Right")}</option>
+                            <option value="top-left">{t("Top-Left")}</option>
+                            <option value="top-right">{t("Top-Right")}</option>
                           </select>
                         </div>
                       );
@@ -1935,7 +1935,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                         </div>
                       )}
                     </div>
-                    <p style={{ fontSize: 9, color: theme.slate }}>Live Preview</p>
+                    <p style={{ fontSize: 9, color: theme.slate }}>{t("Live Preview")}</p>
                   </div>
                 </div>
               </div>

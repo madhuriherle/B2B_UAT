@@ -842,6 +842,14 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   const [generatedParties, setGeneratedParties] = useState([]);
 
   const [requireEsign, setRequireEsign] = useState(true);
+  // Per-signer signature position chosen in the Order Summary position picker.
+  // Keyed by party._uiKey (stable across relabelling) → position string:
+  // "auto" | "bottom-left" | "bottom-right" | "top-left" | "top-right".
+  // Defaults to "auto" for every signer; undefined means SignDesk chooses.
+  const [signerPositions, setSignerPositions] = useState({});
+  const setSignerPosition = (uiKey, pos) =>
+    setSignerPositions((prev) => ({ ...prev, [uiKey]: pos }));
+
   // Guards against a double-click on Send for eSign/Save Document creating
   // two orders — set right before awaiting onSubmitOrder, reset in a
   // finally so it re-enables on failure too (see handleFinalize).
@@ -1277,18 +1285,19 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
     // One eSign signer per party that entered a valid mobile number —
     // Co-Applicants/Guarantors without one simply don't get an invite
     // (see the non-blocking warning shown near the eSign toggle in step 2).
-    // SignDesk's `position` only has 4 valid corner values and must be
-    // unique per signer in the same request — with up to 6 possible
-    // parties (1 Applicant + 3 Co-Applicants + 2 Guarantors), the 5th/6th
-    // signer gets no position at all (it's optional) rather than a
-    // colliding duplicate.
+    // Position is user-chosen per signer in the Order Summary picker;
+    // "auto" (or absent key) means we omit `position` so SignDesk places
+    // it automatically — no more index-based hardcoding.
     const signingParties = generatedParties.filter((p) => isValidMobile(p.address?.present?.mobile));
-    const signers = signingParties.map((p, i) => ({
-      name: p.personal.full_name || ROLE_LABELS[p.role],
-      mobile: p.address.present.mobile,
-      email: p.address.present.email || null,
-      position: SIGNER_POSITIONS[i] || undefined,
-    }));
+    const signers = signingParties.map((p) => {
+      const chosenPos = signerPositions[p._uiKey];
+      return {
+        name: p.personal.full_name || ROLE_LABELS[p.role],
+        mobile: p.address.present.mobile,
+        email: p.address.present.email || null,
+        position: (!chosenPos || chosenPos === "auto") ? undefined : chosenPos,
+      };
+    });
 
     const documentsChecklist = partyChecklistGroups.flatMap(({ uiKey, label, items }) =>
       items.map((item) => {
@@ -1697,15 +1706,36 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
 
 
         {requireEsign && document?.esign_price != null && (() => {
-          const signingCount = generatedParties.filter((p) => isValidMobile(p.address?.present?.mobile)).length || 1;
+          const signingParties = generatedParties.filter((p) => isValidMobile(p.address?.present?.mobile));
+          const signingCount = signingParties.length || 1;
           const basePrice = Number(document.esign_price) * signingCount;
           const gst = Math.round(basePrice * 0.18 * 100) / 100;
           const total = Math.round((basePrice + gst) * 100) / 100;
+
+          // Distinct color per signer (cycles if more than 5).
+          const SIGNER_COLORS = [theme.navy, theme.success, "#A16207", "#7C3AED", "#DB2777"];
+
+          // Map a position key to { top, left, transform } for the doc thumbnail.
+          const POSITION_STYLE = {
+            "bottom-left":  { bottom: 6, left: 6 },
+            "bottom-right": { bottom: 6, right: 6 },
+            "top-left":     { top: 6, left: 6 },
+            "top-right":    { top: 6, right: 6 },
+          };
+
+          // Collect all non-auto positions for the live preview.
+          const positionedSigners = signingParties
+            .map((p, i) => ({ p, i, pos: signerPositions[p._uiKey] }))
+            .filter(({ pos }) => pos && pos !== "auto");
+
           return (
             <div className="mt-4 rounded-xl border overflow-hidden" style={{ borderColor: theme.border }}>
+              {/* Header */}
               <div className="px-4 py-3 border-b" style={{ background: "#F8FAFC", borderColor: theme.border }}>
                 <h3 className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.navy }}>Order Summary</h3>
               </div>
+
+              {/* Price breakdown */}
               <div className="px-4 py-3 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span style={{ color: theme.slate }}>Number of Signers</span>
@@ -1724,13 +1754,150 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                   <span style={{ color: theme.navy }}>&#8377;{total.toFixed(2)}</span>
                 </div>
               </div>
-              <div className="px-4 pb-3 pt-1 space-y-1">
-                {generatedParties.filter((p) => isValidMobile(p.address?.present?.mobile)).map((p, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs py-1 border-t" style={{ borderColor: theme.border }}>
-                    <span className="font-semibold" style={{ color: theme.ink }}>{p.personal?.full_name || ROLE_LABELS[p.role]}</span>
-                    <span style={{ color: theme.slate }}>{p.address?.present?.mobile}</span>
+
+              {/* Signer rows: position picker per signer + live document preview */}
+              <div className="px-4 pb-4 pt-2 border-t" style={{ borderColor: theme.border }}>
+                <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: theme.slate }}>
+                  Signature Positions
+                </p>
+
+                {/* Two-column layout: signer list on left, document preview on right */}
+                <div className="flex gap-4 items-start">
+
+                  {/* Signer rows */}
+                  <div className="flex-1 space-y-2 min-w-0">
+                    {signingParties.map((p, i) => {
+                      const uiKey = p._uiKey;
+                      const chosen = signerPositions[uiKey] || "auto";
+                      const color = SIGNER_COLORS[i % SIGNER_COLORS.length];
+                      const initials = (p.personal?.full_name || ROLE_LABELS[p.role] || "?")
+                        .split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+                      return (
+                        <div key={uiKey} className="flex items-center gap-2 py-1.5 border-t" style={{ borderColor: theme.border }}>
+                          {/* Color swatch avatar */}
+                          <span
+                            className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                            style={{ background: color }}
+                          >
+                            {initials}
+                          </span>
+
+                          {/* Name + mobile */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate" style={{ color: theme.ink }}>
+                              {p.personal?.full_name || ROLE_LABELS[p.role]}
+                            </p>
+                            <p className="text-xs truncate" style={{ color: theme.slate }}>
+                              {p.address?.present?.mobile}
+                            </p>
+                          </div>
+
+                          {/* Position dropdown */}
+                          <select
+                            value={chosen}
+                            onChange={(e) => setSignerPosition(uiKey, e.target.value)}
+                            className="text-xs rounded border px-2 py-1 outline-none flex-shrink-0"
+                            style={{
+                              borderColor: theme.border,
+                              color: theme.ink,
+                              background: "#fff",
+                              minWidth: 110,
+                            }}
+                          >
+                            <option value="auto">Auto</option>
+                            <option value="bottom-left">Bottom-Left</option>
+                            <option value="bottom-right">Bottom-Right</option>
+                            <option value="top-left">Top-Left</option>
+                            <option value="top-right">Top-Right</option>
+                          </select>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+
+                  {/* Live document thumbnail */}
+                  <div className="flex-shrink-0 flex flex-col items-center gap-1">
+                    <div
+                      className="relative rounded border"
+                      style={{
+                        width: 88,
+                        height: 120,
+                        background: "#fff",
+                        borderColor: theme.border,
+                        boxShadow: "0 1px 4px rgba(15,23,42,0.10)",
+                      }}
+                    >
+                      {/* Faint ruled lines to suggest a document */}
+                      {[28, 40, 52, 64, 76].map((y) => (
+                        <div
+                          key={y}
+                          style={{
+                            position: "absolute",
+                            left: 10,
+                            right: 10,
+                            top: y,
+                            height: 1,
+                            background: "#E2E8F0",
+                          }}
+                        />
+                      ))}
+
+                      {/* Positioned signer markers */}
+                      {positionedSigners.map(({ p, i, pos }) => {
+                        const style = POSITION_STYLE[pos];
+                        if (!style) return null;
+                        const color = SIGNER_COLORS[i % SIGNER_COLORS.length];
+                        const initials = (p.personal?.full_name || ROLE_LABELS[p.role] || "?")
+                          .split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+                        return (
+                          <span
+                            key={p._uiKey}
+                            title={`${p.personal?.full_name || ROLE_LABELS[p.role]} · ${pos}`}
+                            style={{
+                              position: "absolute",
+                              ...style,
+                              width: 20,
+                              height: 20,
+                              borderRadius: "50%",
+                              background: color,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#fff",
+                              fontSize: 8,
+                              fontWeight: 700,
+                              lineHeight: 1,
+                              boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
+                            }}
+                          >
+                            {initials}
+                          </span>
+                        );
+                      })}
+
+                      {/* Placeholder hint when nothing is pinned yet */}
+                      {positionedSigners.length === 0 && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexDirection: "column",
+                            gap: 4,
+                          }}
+                        >
+                          <span style={{ fontSize: 20 }}>📄</span>
+                          <span style={{ fontSize: 9, color: theme.slate, textAlign: "center", lineHeight: 1.3, padding: "0 6px" }}>
+                            Pick a position to preview
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 9, color: theme.slate }}>Live Preview</p>
+                  </div>
+                </div>
               </div>
             </div>
           );

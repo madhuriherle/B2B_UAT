@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, Fragment } from 'react';
+import { t } from "../../lib/loanI18n";
 import { theme, serif, inputStyle as baseInputStyle } from "../../lib/userPortalTheme";
 import { apiUrl, apiRequest, apiUpload, getStoredToken } from "../../lib/api";
 import { isValidMobile, isValidEmail } from "../../lib/validation";
@@ -154,6 +155,7 @@ const SECTION_ICONS = {
 };
 
 const SectionHeading = ({ title }) => {
+  const displayTitle = t(title);
   const Icon = SECTION_ICONS[title];
   return (
     <h4 className="text-xs font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: theme.navy }}>
@@ -482,7 +484,7 @@ const SectionFieldGrid = ({ title, fields, values, onChange }) => (
       {fields.map((k) => (
         <div key={k} className={fieldWrapClass(k)}>
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
-            {FIELD_TYPES[k].label}{FIELD_TYPES[k].required && <span style={{ color: "#dc2626" }}> *</span>}
+            {t(FIELD_TYPES[k].label)}{FIELD_TYPES[k].required && <span style={{ color: "#dc2626" }}> *</span>}
           </label>
           <FieldInput fieldKey={k} value={values[k]} onChange={(v) => onChange(k, v)} siblingValues={values} />
         </div>
@@ -590,7 +592,7 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
                   <SimpleInput field={f} value={row[f.key]} onChange={(v) => updateRow(i, f.key, v)} />
                 </div>
               ))}
-              <button type="button" onClick={() => removeRow(i)} className="text-xs font-semibold text-red-600 justify-self-start pb-2.5">Remove</button>
+              <button type="button" onClick={() => removeRow(i)} className="text-xs font-semibold text-red-600 justify-self-start pb-2.5">{t("Remove")}</button>
             </div>
           ))}
           <button type="button" onClick={addRow} className="text-xs font-semibold inline-flex items-center gap-1" style={{ color: theme.navy }}>
@@ -891,6 +893,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
   // Type-specific extra fields (e.g., Vehicle details for Bike/Car Loan)
   const [typeFields, setTypeFields] = useState({});
   const [language, setLanguage] = useState("English");
+  window.currentLoanLanguage = language;
   // Snapshot of exactly what was sent when the draft was generated —
   // persisted with the order, not the live form state.
   const [generatedDynamicFields, setGeneratedDynamicFields] = useState({});
@@ -1434,7 +1437,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
           </div>
           <div className="p-6 space-y-6">
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Language</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">{t("Language")}</label>
           <select value={language} onChange={e => setLanguage(e.target.value)} className={inputClass} style={baseInputStyle}>
             {document.available_languages?.map(lang => (
               <option key={lang} value={lang}>{lang}</option>
@@ -1541,7 +1544,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                 className="text-xs font-semibold px-3 py-1.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ borderColor: theme.border, color: theme.navy }}
               >
-                + Add Co-Applicant
+                + {t("Add Co-Applicant")}
               </button>
               <button
                 type="button"
@@ -1550,7 +1553,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                 className="text-xs font-semibold px-3 py-1.5 rounded border disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ borderColor: theme.border, color: theme.navy }}
               >
-                + Add Guarantor
+                + {t("Add Guarantor")}
               </button>
             </div>
           </div>

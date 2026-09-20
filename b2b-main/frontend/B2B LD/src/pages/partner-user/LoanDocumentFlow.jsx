@@ -672,7 +672,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
   const { filled, total } = countPartyProgress(party);
 
   return (
-    <details open className="rounded-lg border mb-4 overflow-hidden shadow-sm" style={{ borderColor: theme.border, borderLeft: `4px solid ${roleColor}`, background: "#fff" }}>
+    <details open className="rounded-lg border mb-4 overflow-hidden shadow-sm" style={{ borderColor: theme.border, background: "#fff" }}>
       <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-2" style={{ background: "#F3F8FB" }}>
         <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide" style={{ color: roleColor }}>
           <RoleIcon size={16} strokeWidth={2.25} />

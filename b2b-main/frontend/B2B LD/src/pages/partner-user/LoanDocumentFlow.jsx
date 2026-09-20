@@ -330,7 +330,7 @@ const PARTY_ADDRESS_FIELDS = [
   { key: "city", label: "City", type: "text" },
   { key: "district", label: "District", type: "text" },
   { key: "state", label: "State", type: "select", options: INDIAN_STATES },
-  { key: "pincode", label: "Pincode", type: "text", placeholder: "6-digit PIN — fills City/District/State", maxLength: 6 },
+  { key: "pincode", label: "Pincode", type: "text", maxLength: 6 },
   { key: "country", label: "Country", type: "text" },
   { key: "mobile", label: "Mobile Number", type: "text" },
   { key: "email", label: "Email", type: "email" },
@@ -479,7 +479,7 @@ const FieldInput = ({ fieldKey, value, onChange, siblingValues }) => {
 
 const SectionFieldGrid = ({ title, fields, values, onChange }) => (
   <div className="bg-white p-4 rounded-xl border shadow-sm" style={{ borderColor: theme.border }}>
-      <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>{title}</h3>
+      <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>{t(title)}</h3>
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
       {fields.map((k) => (
         <div key={k} className={fieldWrapClass(k)}>
@@ -656,7 +656,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
         </span>
         <span className="flex items-center gap-3">
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: "#fff", color: theme.slate, border: `1px solid ${theme.border}` }}>
-            {filled}/{total} filled
+            {filled} {t("filled")}/{total} filled
           </span>
           {removable && (
             <button
@@ -854,7 +854,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
     parties.forEach((p) => { totals[p.role] += 1; });
     return parties.map((party, idx) => {
       seen[party.role] += 1;
-      const label = totals[party.role] > 1 ? `${ROLE_LABELS[party.role]} ${seen[party.role]}` : ROLE_LABELS[party.role];
+      const label = totals[party.role] > 1 ? `${t(ROLE_LABELS[party.role])} ${seen[party.role]}` : t(ROLE_LABELS[party.role]);
       return { party, idx, label };
     });
   })();
@@ -1454,8 +1454,8 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t(partyRows[ekycTargetIndex]?.label || "Applicant")} + " " + t("Mobile")</label>
-                    <input type="text" value={ekycMobile} onChange={e => setEkycMobile(e.target.value)} placeholder="Optional" disabled={ekycStage === "verifying" || ekycStage === "fetching"} className={inputClass} style={baseInputStyle} />
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t(partyRows[ekycTargetIndex]?.label || "Applicant")} {t("Mobile")}</label>
+                    <input type="text" value={ekycMobile} onChange={e => setEkycMobile(e.target.value)} placeholder={t("Optional")} disabled={ekycStage === "verifying" || ekycStage === "fetching"} className={inputClass} style={baseInputStyle} />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Document Type")}</label>
@@ -1620,10 +1620,10 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                               </div>
                               <div>
                                 <h4 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                                  {item.document_name} {item.is_mandatory && <span className="text-red-500">*</span>}
+                                  {t(item.document_name)} {item.is_mandatory && <span className="text-red-500">*</span>}
                                 </h4>
-                                {item.description && <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>}
-                                {!file && <p className="text-[10px] text-slate-400 mt-1">PDF, JPG, or PNG under 5MB</p>}
+                                {item.description && <p className="text-xs text-slate-500 mt-0.5">{t(item.description)}</p>}
+                                {!file && <p className="text-[10px] text-slate-400 mt-1">{t("PDF, JPG, or PNG under 5MB")}</p>}
                               </div>
                             </div>
                             <label className="flex items-center gap-1.5 cursor-pointer z-10" title="Confirm manually without file">
@@ -1644,7 +1644,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                           ) : (
                             <label className="w-full py-2 rounded-xl text-center text-xs font-bold transition shadow-sm cursor-pointer border" style={{ background: theme.bg, color: theme.navy, borderColor: theme.border }}>
                               <input type="file" accept="image/jpeg,image/png,application/pdf" className="hidden" onChange={(e) => { setChecklistFile(compositeKey, e.target.files?.[0]); e.target.value = ""; }} />
-                              Browse file to upload
+                              {t("Browse file to upload")}
                             </label>
                           )}
                         </div>

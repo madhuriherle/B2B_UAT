@@ -626,44 +626,18 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
   const updatePersonal = (key, value) => onChange({ ...party, personal: { ...party.personal, [key]: value } });
   const updateEmployment = (key, value) => onChange({ ...party, employment: { ...party.employment, [key]: value } });
 
-  // On a valid 6-digit PIN, fetch City/District/State and merge them into
-  // that same address block once the lookup resolves — via a functional
-  // update (see updateParty above) so a slow response can't stomp on
-  // edits made to other fields in the meantime. Overwrites City/District/
-  // State with the lookup result (that's the point of auto-fill); the
-  // user can still edit any of the three afterward if the PIN maps to the
-  // wrong locality.
-  const autofillFromPincode = (blockKey, pincode) => {
-    if (!/^\d{6}$/.test(pincode)) return;
-    lookupPincode(pincode).then((result) => {
-      if (!result) return;
-      onChange((prevParty) => ({
-        ...prevParty,
-        address: {
-          ...prevParty.address,
-          [blockKey]: {
-            ...(prevParty.address[blockKey] || emptyAddressBlock()),
-            pincode,
-            ...(result.city ? { city: result.city } : {}),
-            ...(result.district ? { district: result.district } : {}),
-            ...(result.state ? { state: result.state } : {}),
-          },
-        },
-      }));
-    });
-  };
 
   const updatePresent = (key, value) => {
     onChange({ ...party, address: { ...party.address, present: { ...party.address.present, ...withDistrictReset(key, value) } } });
-    if (key === "pincode") autofillFromPincode("present", value);
+    
   };
   const updatePermanent = (key, value) => {
     onChange({ ...party, address: { ...party.address, permanent: { ...(party.address.permanent || emptyAddressBlock()), ...withDistrictReset(key, value) } } });
-    if (key === "pincode") autofillFromPincode("permanent", value);
+    
   };
   const updateOffice = (key, value) => {
     onChange({ ...party, address: { ...party.address, office: { ...(party.address.office || emptyAddressBlock()), ...withDistrictReset(key, value) } } });
-    if (key === "pincode") autofillFromPincode("office", value);
+    
   };
   const togglePermanentSame = (same) => onChange({ ...party, address: { ...party.address, permanent_same_as_present: same, permanent: same ? null : emptyAddressBlock() } });
   const toggleOffice = (has) => onChange({ ...party, address: { ...party.address, office: has ? emptyAddressBlock() : null } });
@@ -707,9 +681,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
           <FieldGrid fields={PARTY_PRESENT_ADDRESS_FIELDS} values={party.address.present} onChange={updatePresent} />
 
           <label className="flex items-center gap-2 mt-3 text-xs font-semibold" style={{ color: theme.ink }}>
-            <input type="checkbox" checked={party.address.permanent_same_as_present} onChange={(e) => togglePermanentSame(e.target.checked)} />
-            Permanent address same as present
-          </label>
+            <input type="checkbox" checked={party.address.permanent_same_as_present} onChange={(e) => togglePermanentSame(e.target.checked)} /> {t("Permanent address same as present")}</label>
           {!party.address.permanent_same_as_present && (
             <div className="mt-2">
               <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Permanent Address</p>
@@ -718,9 +690,7 @@ const PartyCard = ({ party, roleLabel, removable, onRemove, onChange }) => {
           )}
 
           <label className="flex items-center gap-2 mt-3 text-xs font-semibold" style={{ color: theme.ink }}>
-            <input type="checkbox" checked={!!party.address.office} onChange={(e) => toggleOffice(e.target.checked)} />
-            Add office / business address
-          </label>
+            <input type="checkbox" checked={!!party.address.office} onChange={(e) => toggleOffice(e.target.checked)} /> {t("Add office / business address")}</label>
           {party.address.office && (
             <div className="mt-2">
               <p className="text-[11px] font-semibold uppercase mb-1.5" style={{ color: theme.slate }}>Office / Business Address</p>

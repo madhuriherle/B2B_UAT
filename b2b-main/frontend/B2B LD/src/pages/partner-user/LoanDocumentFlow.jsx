@@ -1394,9 +1394,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         </div>
 
         {useEkyc && (
-          <div className="space-y-4 pt-4 border-t" style={{ borderColor: theme.border }}>
-            <h3 className="text-xs font-bold uppercase tracking-wide" style={{ color: theme.navy }}>Identity Verification</h3>
-
+          <div className="space-y-4 mt-2 bg-[#F8FAFC] p-4 rounded-xl border border-slate-200">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Verifying identity for</label>
               <select
@@ -1408,9 +1406,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
               >
                 {partyRows.map(({ idx, label }) => <option key={idx} value={idx}>{label}</option>)}
               </select>
-              <p className="text-xs mt-1.5" style={{ color: theme.slate }}>
-                Each party's identity is verified (and billed) separately — switch here to run eKYC for a different Co-Applicant or Guarantor.
-              </p>
+              
             </div>
 
             {ekycStage === "done" ? (
@@ -1437,9 +1433,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
                   </div>
                 </div>
 
-                <p className="text-xs" style={{ color: theme.slate }}>
-                  Verifying will create a separate eKYC order and charge ₹{ekycService?.price} from your wallet.
-                </p>
+                
 
                 {ekycError && (
                   <div className="p-3 rounded text-sm bg-red-50 text-red-700 border border-red-200">{ekycError}</div>
@@ -1473,9 +1467,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
             <h2 className="text-base font-bold text-slate-800 uppercase tracking-wide">Parties & KYC</h2>
           </div>
           <div className="p-6">
-            <p className="text-sm text-slate-500 mb-6">
-              {useEkyc ? `${partyRows[ekycTargetIndex]?.label || "Applicant"}'s name/DOB/PAN/Aadhaar are filled from eKYC – edit if needed, or switch "Verifying identity for" above to run it for a different party.` : "Fill in the Applicant, then add Co-Applicants or Guarantors as needed."} Parties without a valid mobile number won't receive an eSign invite.
-            </p>
+            
             <div className="flex items-center justify-end mb-4 flex-wrap gap-3">
             <div className="flex gap-2">
               <button

@@ -466,7 +466,7 @@ const FieldInput = ({ fieldKey, value, onChange, siblingValues }) => {
     return (
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} style={baseInputStyle}>
         <option value="">Select {cfg.label.toLowerCase()}</option>
-        {cfg.options.map((o) => <option key={o} value={o}>{o}</option>)}
+        {cfg.options.map((o) => <option key={o} value={o}>{t(o)}</option>)}
       </select>
     );
   }
@@ -501,8 +501,8 @@ const SimpleInput = ({ field, value, onChange }) => {
   if (field.type === "select") {
     return (
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} className={inputClass} style={baseInputStyle}>
-        <option value="">Select</option>
-        {field.options.map((o) => <option key={o} value={o}>{o}</option>)}
+        <option value="">{t("Select")}</option>
+        {field.options.map((o) => <option key={o} value={o}>{t(o)}</option>)}
       </select>
     );
   }
@@ -533,7 +533,7 @@ const FieldGrid = ({ fields, values, onChange }) => (
         return (
           <div key={f.key}>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
-              {f.label}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
+              {t(f.label)}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
             </label>
             <select
               value={values?.district || ""}
@@ -551,7 +551,7 @@ const FieldGrid = ({ fields, values, onChange }) => (
       return (
         <div key={f.key}>
           <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>
-            {f.label}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
+            {t(f.label)}{f.required && <span style={{ color: "#dc2626" }}> *</span>}
           </label>
           <SimpleInput field={f} value={values?.[f.key]} onChange={(v) => onChange(f.key, v)} />
         </div>
@@ -588,7 +588,7 @@ const RepeatingRowsSection = ({ title, fields, rows, onChange, emptyRow }) => {
             <div key={i} className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 gap-3 mb-2 items-end">
               {fields.map((f) => (
                 <div key={f.key}>
-                  <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: theme.slate }}>{f.label}</label>
+                  <label className="block text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: theme.slate }}>{t(f.label)}</label>
                   <SimpleInput field={f} value={row[f.key]} onChange={(v) => updateRow(i, f.key, v)} />
                 </div>
               ))}
@@ -1446,7 +1446,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         </div>
 
         <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
-          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Identity Verification</label>
+          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Identity Verification")}</label>
           <div className="flex gap-2 items-center flex-wrap">
             <button type="button" onClick={() => setUseEkyc(false)} className="px-4 py-2 rounded text-sm font-semibold border" style={{ background: !useEkyc ? theme.navy : "#fff", color: !useEkyc ? "#fff" : theme.ink, borderColor: !useEkyc ? theme.navy : theme.border }}>
               Manual Form
@@ -1463,7 +1463,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         {useEkyc && (
           <div className="space-y-4 mt-2 bg-[#F8FAFC] p-4 rounded-xl border border-slate-200">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Verifying identity for</label>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Verifying identity for")}</label>
               <select
                 value={ekycTargetIndex}
                 onChange={(e) => changeEkycTarget(Number(e.target.value))}
@@ -1484,18 +1484,18 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
               <>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{partyRows[ekycTargetIndex]?.label || "Applicant"} Mobile</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t(partyRows[ekycTargetIndex]?.label || "Applicant")} + " " + t("Mobile")</label>
                     <input type="text" value={ekycMobile} onChange={e => setEkycMobile(e.target.value)} placeholder="Optional" disabled={ekycStage === "verifying" || ekycStage === "fetching"} className={inputClass} style={baseInputStyle} />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Document Type</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Document Type")}</label>
                     <select value={ekycDocType} onChange={e => setEkycDocType(e.target.value)} disabled={ekycStage === "verifying" || ekycStage === "fetching"} className={inputClass} style={baseInputStyle}>
                       <option value="">Select document type</option>
                       {EKYC_DOC_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Upload ID Document</label>
+                    <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Upload ID Document")}</label>
                     <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={e => setEkycFile(e.target.files?.[0] || null)} disabled={ekycStage === "verifying" || ekycStage === "fetching"} className={inputClass} style={baseInputStyle} />
                   </div>
                 </div>
@@ -1582,21 +1582,21 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
               <h3 className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color: theme.navy }}>Base Configuration</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Loan Amount<span style={{ color: "#dc2626" }}> *</span></label>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Loan Amount")}<span style={{ color: "#dc2626" }}> *</span></label>
               <input type="number" value={formData.loanAmount} onChange={e => setField("loanAmount", e.target.value)} className={inputClass} style={baseInputStyle} />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Tenure (Months)<span style={{ color: "#dc2626" }}> *</span></label>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Tenure (Months)")}<span style={{ color: "#dc2626" }}> *</span></label>
               <input type="number" value={formData.tenure} onChange={e => setField("tenure", e.target.value)} className={inputClass} style={baseInputStyle} />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Interest Rate (% p.a.)</label>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Interest Rate (% p.a.)")}</label>
               <input type="number" value={formData.interestRate} onChange={e => setField("interestRate", e.target.value)} placeholder="12" className={inputClass} style={baseInputStyle} />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Repayment Frequency</label>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Repayment Frequency")}</label>
               <select value={formData.repaymentFrequency} onChange={e => setField("repaymentFrequency", e.target.value)} className={inputClass} style={baseInputStyle}>
-                {REPAYMENT_FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
+                {REPAYMENT_FREQUENCIES.map(f => <option key={f} value={f}>{t(f)}</option>)}
               </select>
               </div>
             </div>
@@ -1753,7 +1753,7 @@ export default function LoanDocumentFlow({ document, onCancel, onSubmitOrder, ek
         )}
 
         <div className="pt-4 border-t" style={{ borderColor: theme.border }}>
-          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>Finalization</label>
+          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: theme.slate }}>{t("Finalization")}</label>
           <div className="flex gap-2">
             <button type="button" onClick={() => setRequireEsign(true)} className="px-4 py-2 rounded text-sm font-semibold border" style={{ background: requireEsign ? theme.navy : "#fff", color: requireEsign ? "#fff" : theme.ink, borderColor: requireEsign ? theme.navy : theme.border }}>
               Require eSign{document?.esign_price ? ` (₹${document.esign_price}/signer)` : ""}
